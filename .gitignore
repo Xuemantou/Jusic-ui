@@ -1,0 +1,32 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# editor
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# pnpm store redirect (local only)
+../.pnpm-store
+../.pnpm-cache
+../.pnpm-state
+
+# TypeScript build artifacts (vue-tsc -b)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# 本地调试（无头浏览器 profile）
+.firefox-profile
