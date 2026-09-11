@@ -108,7 +108,11 @@ function search() {
 }
 
 function getPictureUrl(item: { url: string }) {
-  return `https://tx.alang.run/doutu${item.url.slice(item.url.lastIndexOf('/'))}`
+  if (!item.url) return ''
+  const index = item.url.lastIndexOf('/')
+  // 没有路径分隔符时不能 slice(-1)，否则会拼出一个无意义的 URL
+  if (index === -1) return ''
+  return `https://tx.alang.run/doutu${item.url.slice(index)}`
 }
 
 function startLoadingPictures(newData: PictureItem[]) {

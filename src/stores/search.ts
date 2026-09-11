@@ -34,8 +34,9 @@ export const useSearchStore = defineStore('search', () => {
   function setKeyword(value: string) {
     keyword.value = value
   }
+  /** 各列表同样在入口过滤空元素：模板里都是直接访问 row.xxx，一个 null 就会让整页渲染崩掉 */
   function setData(value: Music[]) {
-    data.value = value
+    data.value = Array.isArray(value) ? value.filter((m) => m != null) : []
   }
   function setCount(value: number) {
     count.value = value
@@ -44,7 +45,7 @@ export const useSearchStore = defineStore('search', () => {
     pictureKeyword.value = value
   }
   function setPictureData(value: PictureItem[]) {
-    pictureData.value = value
+    pictureData.value = Array.isArray(value) ? value.filter((m) => m != null) : []
   }
   function setPictureCount(value: number) {
     pictureCount.value = value
@@ -53,7 +54,7 @@ export const useSearchStore = defineStore('search', () => {
     gdKeyword.value = value
   }
   function setGdData(value: SongList[]) {
-    gdData.value = value
+    gdData.value = Array.isArray(value) ? value.filter((m) => m != null) : []
   }
   function setGdCount(value: number) {
     gdCount.value = value
@@ -62,7 +63,7 @@ export const useSearchStore = defineStore('search', () => {
     userKeyword.value = value
   }
   function setUserData(value: UserInfo[]) {
-    userData.value = value
+    userData.value = Array.isArray(value) ? value.filter((m) => m != null) : []
   }
   function setUserCount(value: number) {
     userCount.value = value

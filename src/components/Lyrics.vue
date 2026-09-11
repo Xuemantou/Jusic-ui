@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   lyrics: Record<number, string>
@@ -21,24 +21,30 @@ const props = defineProps<{
 }>()
 
 const container = ref<HTMLElement | null>(null)
-const lastNumber = ref(0)
+/** 当前高亮行（computed 里不应写状态，改为在 watch 中推进） */
+const activeLine = ref(0)
 
-const activeLine = computed(() => {
-  const { lyrics, currentTime } = props
-  const number = Math.floor(currentTime)
-  if (Object.keys(lyrics).length === 0) return lastNumber.value
-  if (lyrics[number] !== undefined && lyrics[number] !== '') {
-    lastNumber.value = number
-    return number
-  }
-  return lastNumber.value
-})
+// 已有歌词就按秒定位；换歌（歌词清空）时归零，避免残留上一首的高亮行
+watch(
+  [() => props.currentTime, () => props.lyrics],
+  ([time, lyrics]) => {
+    if (Object.keys(lyrics).length === 0) {
+      activeLine.value = 0
+      return
+    }
+    const number = Math.floor(time)
+    if (lyrics[number] !== undefined && lyrics[number] !== '') {
+      activeLine.value = number
+    }
+  },
+  { immediate: true },
+)
 
-watch(activeLine, async () => {
-  await nextTick()
+// flush: 'post' 保证 DOM 已更新，无需再手动 nextTick
+watch(activeLine, () => {
   const el = container.value?.querySelector('.lyrics-active')
   el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-})
+}, { flush: 'post' })
 </script>
 
 <style scoped>

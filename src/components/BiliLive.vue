@@ -39,6 +39,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import decompress from 'brotli/decompress'
 import { baseUrl } from '@/config/environment'
 import { useSocket } from '@/composables/useSocket'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{
   modelValue: boolean
@@ -50,6 +51,7 @@ defineEmits<{
 }>()
 
 const { send } = useSocket()
+const toast = useToast()
 
 const roomId = ref('')
 const connected = ref(false)
@@ -68,17 +70,27 @@ watch(
 )
 
 async function getRoomId(id: string) {
-  const response = await fetch(`${baseUrl}/bili/room_init/${id}`)
-  const text = await response.json()
-  if (text.code == '20000') return text.data.data
-  return {}
+  try {
+    const response = await fetch(`${baseUrl}/bili/room_init/${id}`)
+    if (!response.ok) return {}
+    const text = await response.json()
+    if (text.code == '20000') return text.data.data
+    return {}
+  } catch {
+    return {}
+  }
 }
 
 async function getWebSocketHost(roomid: string) {
-  const response = await fetch(`${baseUrl}/bili/getDanmuInfo/${roomid}`)
-  const text = await response.json()
-  if (text.code == '20000') return text.data.data
-  return {}
+  try {
+    const response = await fetch(`${baseUrl}/bili/getDanmuInfo/${roomid}`)
+    if (!response.ok) return {}
+    const text = await response.json()
+    if (text.code == '20000') return text.data.data
+    return {}
+  } catch {
+    return {}
+  }
 }
 
 async function connectBiliBili() {
@@ -86,12 +98,21 @@ async function connectBiliBili() {
   if (room.indexOf('h5/') !== -1) room = room.replace('h5/', '')
   const numberStrArray = room.match(/\d+/)
   if (numberStrArray) room = numberStrArray[0]
-  else return
+  else {
+    toast.error('请输入正确的直播间房间号或链接')
+    return
+  }
 
   const realRoom = await getRoomId(room)
-  const realRoomId = realRoom.room_id
-  const realData = await getWebSocketHost(realRoomId)
-  if (!realData?.host_list?.length) return
+  if (!realRoom?.room_id) {
+    toast.error('获取直播间信息失败，请检查房间号')
+    return
+  }
+  const realData = await getWebSocketHost(realRoom.room_id)
+  if (!realData?.host_list?.length) {
+    toast.error('获取弹幕服务器失败，请稍后重试')
+    return
+  }
 
   socket = new WebSocket(`wss://${realData.host_list[0].host}/sub`)
   socket.binaryType = 'arraybuffer'
@@ -99,7 +120,7 @@ async function connectBiliBili() {
     connected.value = true
     const joinData = {
       uid: 0,
-      roomid: realRoomId,
+      roomid: realRoom.room_id,
       protover: 3,
       platform: 'web',
       type: 2,
@@ -117,6 +138,18 @@ async function connectBiliBili() {
       i.setUint32(12, 1)
       socket!.send(i.buffer)
     }, 30000)
+  }
+  // 断线/失败时必须复位状态，否则按钮一直显示「断开连接」、心跳定时器继续跑
+  socket.onclose = () => {
+    connected.value = false
+    if (timer) clearInterval(timer)
+    timer = null
+  }
+  socket.onerror = () => {
+    connected.value = false
+    if (timer) clearInterval(timer)
+    timer = null
+    toast.error('直播间连接失败')
   }
   socket.onmessage = (evt) => onMessage(evt)
 }
@@ -244,7 +277,9 @@ function convertToObject(buf: ArrayBufferLike): any {
 
 function disconnectBiliBili() {
   if (timer) clearInterval(timer)
+  timer = null
   socket?.close()
+  socket = null
   connected.value = false
 }
 

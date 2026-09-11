@@ -7,6 +7,17 @@
         <v-icon size="small" class="mr-1">mdi-account-group</v-icon>
         {{ online }}
       </v-btn>
+      <v-btn
+        v-if="!isConnected"
+        color="warning"
+        size="small"
+        variant="tonal"
+        title="重新连接服务器"
+        @click="reconnect"
+      >
+        <v-icon size="small" class="mr-1">mdi-refresh</v-icon>
+        重新连接
+      </v-btn>
       <v-btn icon size="small" variant="text" title="清空聊天" @click="clearChat">
         <v-icon size="small">mdi-broom</v-icon>
       </v-btn>
@@ -14,7 +25,9 @@
 
     <!-- 聊天消息 -->
     <div ref="chatContainer" class="chat-container">
-      <div v-for="(item, index) in chatData" :key="index" class="chat-item">
+      <!-- key 用 store 分配的自增 id：chat 有 300 条上限，裁剪时 index 会整体左移，
+           若 key 里含 index 会导致每次新消息重建整串 DOM 节点 -->
+      <div v-for="item in chatData" :key="item.id" class="chat-item">
         <div v-if="item.type === 'notice'" class="chat-notice">{{ item.content }}</div>
         <div v-else>
           <div class="chat-user">
@@ -106,7 +119,7 @@ defineEmits<{
 
 const chatStore = useChatStore()
 const socketStore = useSocketStore()
-const { sendHandler, musicSkipVote, send } = useSocket()
+const { sendHandler, musicSkipVote, send, reconnect } = useSocket()
 
 const sourceChat = ref('wy')
 const chatContainer = ref<HTMLElement | null>(null)
@@ -123,6 +136,7 @@ const EMOJIS = [
 
 const chatData = computed(() => chatStore.data)
 const online = computed(() => socketStore.online)
+const isConnected = computed(() => socketStore.isConnected)
 const isAdminView = computed(() => socketStore.isRoot || socketStore.isAdmin)
 
 const chatMessage = computed({
@@ -154,7 +168,8 @@ function houseUser() {
 }
 
 watch(
-  () => chatStore.data.length,
+  // 监听最后一条而不是长度：超过上限裁剪旧消息时长度可能不变
+  () => chatStore.data[chatStore.data.length - 1],
   async () => {
     await nextTick()
     const el = chatContainer.value

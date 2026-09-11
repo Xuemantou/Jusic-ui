@@ -1,5 +1,5 @@
 <template>
-  <v-dialog :model-value="modelValue" width="auto" max-width="420" @update:model-value="$emit('update:modelValue', $event)" @after-open="loadShare">
+  <v-dialog :model-value="modelValue" width="auto" max-width="420" @update:model-value="$emit('update:modelValue', $event)">
     <v-card>
       <v-card-title class="d-flex align-center">
         <span>分享房间</span>
@@ -32,20 +32,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { useHouseStore } from '@/stores/house'
 import { useToast } from '@/composables/useToast'
 import http from '@/utils/http'
 import { SUCCESS_CODE } from '@/types/message'
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
 }>()
 
 defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
+
+// 打开即生成二维码/小程序码。
+// 不用 @after-enter：过渡动画被打断（快速开关）时该事件可能不触发。
+watch(
+  () => props.modelValue,
+  (visible) => {
+    if (visible) loadShare()
+  },
+)
 
 const houseStore = useHouseStore()
 const toast = useToast()

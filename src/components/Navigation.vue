@@ -12,13 +12,13 @@
       <v-card-item>
         <template #prepend>
           <v-avatar size="45" color="primary">
-            <v-img src="../assets/images/uicon.jpg" cover />
+            <v-img :src="uicon" cover />
           </v-avatar>
         </template>
         <v-card-title>JumpAlang</v-card-title>
         <v-card-subtitle>Quanzhou, China</v-card-subtitle>
       </v-card-item>
-      <v-img src="../assets/images/fl.jpg" height="200" cover />
+      <v-img :src="flPic" height="200" cover />
       <v-card-text>聊天、斗图、音乐、点播、娱乐</v-card-text>
     </v-card>
 
@@ -37,12 +37,16 @@
       <v-divider />
       <v-list-subheader>赞赏</v-list-subheader>
     </v-list>
-    <v-img src="../assets/images/aplause.jpg" class="pa-2" />
+    <v-img :src="aplause" class="pa-2" />
   </v-navigation-drawer>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+// v-img 的 src 是普通字符串 prop，Vite 不会处理相对路径，必须 import 才会被打包
+import uicon from '@/assets/images/uicon.jpg'
+import flPic from '@/assets/images/fl.jpg'
+import aplause from '@/assets/images/aplause.jpg'
 
 defineProps<{
   musichouse: string

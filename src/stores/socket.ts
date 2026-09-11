@@ -6,10 +6,9 @@ import { ref } from 'vue'
  * （对齐旧 Vuex 的 state.socket）
  */
 export const useSocketStore = defineStore('socket', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const socketClient = ref<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stompClient = ref<any>(null)
+  // 连接实例只在 useSocket 内部使用，这里只做透出，避免 any 扩散
+  const socketClient = ref<unknown>(null)
+  const stompClient = ref<unknown>(null)
 
   const online = ref(0)
   const isConnected = ref(false)

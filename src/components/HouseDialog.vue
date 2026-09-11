@@ -1,5 +1,5 @@
 <template>
-  <v-dialog :model-value="modelValue" width="auto" max-width="700" @update:model-value="$emit('update:modelValue', $event)" @after-open="getHouses">
+  <v-dialog :model-value="modelValue" width="auto" max-width="700" @update:model-value="$emit('update:modelValue', $event)">
     <v-card>
       <v-card-title class="d-flex align-center">
         <span>听歌房</span>
@@ -91,13 +91,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useHouseStore } from '@/stores/house'
 import { useSocket } from '@/composables/useSocket'
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
 }>()
+
+// 打开即拉取房间列表。
+// 不用 @after-enter：过渡动画被打断（快速开关）时该事件可能不触发，监听打开动作更可靠。
+watch(
+  () => props.modelValue,
+  (visible) => {
+    if (visible) getHouses()
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]

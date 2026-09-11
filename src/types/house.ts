@@ -28,10 +28,12 @@ export interface HouseForm {
   retainKey: string
 }
 
-/** 聊天消息 */
+/** 聊天消息（后端 Chat 默认 type='chat'，系统提示为本地构造的 'notice'） */
 export interface ChatMessage {
-  type: 'chat' | 'notice'
-  content: string
+  /** 前端分配的自增 id，仅用于列表 key */
+  id?: number
+  type?: 'chat' | 'notice'
+  content?: string
   nickName?: string
   sessionId?: string
   images?: string[]

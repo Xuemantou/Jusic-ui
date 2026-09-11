@@ -25,13 +25,29 @@ import { useToast } from '@/composables/useToast'
 let sockJS: WebSocket | null = null
 let stompClient: CompatClient | null = null
 
-/** 播放器无缝切歌预加载状态 */
-let firstLoaded = 0
+/** 无缝切歌：待预加载的下一首 URL（= cleanMusicUrl 后的地址，与真正播放的地址一致） */
 let secondUrl = ''
+
+/**
+ * 音乐地址清洗结果缓存（原始地址 → 清洗后地址）。
+ * 目的：让「预加载的第二首」与「后端随后推送播放的第二首」落到同一个 URL，
+ * 否则时间戳/域名重写每次都会变，预加载等于白下。
+ * 加 TTL 是因为清洗结果里带 timestamp，过旧可能被音源拒。
+ */
+const URL_CACHE_TTL = 5 * 60 * 1000
+const URL_CACHE_MAX = 50
+const cleanedUrlCache = new Map<string, { url: string; time: number }>()
 
 /** 倒计时退出 */
 let closeClock: ReturnType<typeof setTimeout> | null = null
 let onCloseHook: (() => void) | null = null
+
+/** 断线重连控制：最多尝试 5 次，间隔指数退避，避免服务不可达时自激循环 */
+const RECONNECT_MAX = 5
+let reconnectAttempt = 0
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+/** 主动断开标记：用户/倒计时触发的 disconnect 不应再触发自动重连 */
+let manualClose = false
 
 export function useSocket() {
   const socketStore = useSocketStore()
@@ -43,6 +59,32 @@ export function useSocket() {
 
   /** 建立连接 */
   function connect(houseId: string, housePwd: string, connectType: string) {
+    // 复用一条连接：换房 / 重复调用时先断旧连接，避免多个 socket 与重复订阅
+    if (stompClient) disconnect()
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    // 主动关闭的是「旧」socket；旧 socket 的 onclose 是异步派发的，
+    // 靠 manualClose 区分不了（见 onclose 里的 socket === sockJS 校验），这里必须复位
+    manualClose = false
+    // 注意：这里不能重置 reconnectAttempt —— 自动重连走的就是「onclose → 延时 → connect()」，
+    // 一旦在此归零，退避次数永远累计不到上限，就成了无限重连。
+    // 计数只在连接成功时归零，以及用户手动重连时清空。
+
+    // 换房时清掉上一个房间的播放与状态残留，避免继续播旧歌、列表显示旧房间的点歌
+    secondUrl = ''
+    playerStore.setMusic2({})
+    playerStore.setPick([])
+    playerStore.setLyric('')
+    playerStore.setLyrics({})
+    playerStore.setProgress(0)
+    playerStore.setTime('00:00 / 00:00')
+    socketStore.setOnline(0)
+    socketStore.setRoot(false)
+    socketStore.setAdmin(false)
+    socketStore.setGood(false)
+
     const socket = new SockJS(
       `${baseUrl}/server?houseId=${houseId}&housePwd=${housePwd}&connectType=${connectType}`,
     )
@@ -53,26 +95,25 @@ export function useSocket() {
       {},
       () => {
         socketStore.setIsConnected(true)
+        reconnectAttempt = 0
 
         // 拦截底层 onmessage，自行解析服务端推送的"伪 STOMP 帧"
         const afterOnMessage = socket.onmessage
         socket.onmessage = (message: MessageEvent) => {
-          messageHandler(message)
+          if (socket === sockJS) messageHandler(message)
           if (afterOnMessage) afterOnMessage.call(socket, message)
         }
 
-        // 拦截 onclose，断线自动重连
+        // 拦截 onclose，断线有限重试（指数退避）
         const afterOnclose = socket.onclose
         socket.onclose = (e: CloseEvent) => {
-          if (e.type === 'close') {
+          // 只处理「当前活跃连接」的事件。
+          // 被 connect() 主动关掉的旧 socket 也会异步派发 onclose（sockjs-client 在 _close() 里 setTimeout 派发），
+          // 不区分就会在新连接刚建立后触发一次多余重连（掐断新连接 + 误报「网络异常」）。
+          // 注意：不能用 e.target 判断 —— SockJS 用的是自研 EventTarget，事件对象没有 target 属性。
+          if (e.type === 'close' && socket === sockJS) {
             socketStore.setIsConnected(false)
-            chatStore.pushData({ type: 'notice', content: '网络异常, 请尝试重新连接服务器!' })
-            toast.error('网络异常, 请尝试重新连接服务器!')
-            setTimeout(() => {
-              if (!socketStore.isConnected) {
-                connect(houseStore.houseId, houseStore.housePwd, houseStore.connectType)
-              }
-            }, 444)
+            scheduleReconnect()
           }
           if (afterOnclose) afterOnclose.call(socket, e)
         }
@@ -85,6 +126,8 @@ export function useSocket() {
       },
       () => {
         // 连接失败回调
+        socketStore.setIsConnected(false)
+        scheduleReconnect()
       },
     )
 
@@ -92,22 +135,70 @@ export function useSocket() {
     socketStore.setStompClient(stompClient)
   }
 
-  /** 断开连接 */
+  /** 断线重连：有限次数 + 指数退避；用尽后提示用户手动重连，不再无限建连 */
+  function scheduleReconnect() {
+    if (manualClose || socketStore.isConnected) return
+    if (reconnectAttempt >= RECONNECT_MAX) {
+      chatStore.pushData({
+        type: 'notice',
+        content: `已尝试重连 ${RECONNECT_MAX} 次仍未成功，请点击「重新连接」或刷新页面`,
+      })
+      toast.error('重连失败，请手动重连')
+      return
+    }
+    reconnectAttempt += 1
+    if (reconnectAttempt === 1) {
+      chatStore.pushData({ type: 'notice', content: '网络异常, 请尝试重新连接服务器!' })
+      toast.error('网络异常, 请尝试重新连接服务器!')
+    }
+    const delay = 444 * reconnectAttempt
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      if (!socketStore.isConnected) {
+        connect(houseStore.houseId, houseStore.housePwd, houseStore.connectType)
+      }
+    }, delay)
+  }
+
+  /** 用户手动重连（清空重试计数后立即发起） */
+  function reconnect() {
+    reconnectAttempt = 0
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    connect(houseStore.houseId, houseStore.housePwd, houseStore.connectType)
+  }
+
+  /** 断开连接（主动断开不触发自动重连） */
   function disconnect() {
+    manualClose = true
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    // 不重置 reconnectAttempt：connect() 内部也会先 disconnect()，
+    // 在这里归零会让自动重连的退避计数永远回到 0（即无限重连）
     if (stompClient) stompClient.disconnect()
     if (sockJS) sockJS.close()
+    sockJS = null
+    stompClient = null
     socketStore.setIsConnected(false)
+    socketStore.setSocketClient(null)
+    socketStore.setStompClient(null)
   }
 
   /** 注册断开后的回调（用于回到首页等） */
-  function setCloseHook(hook: () => void) {
+  function setCloseHook(hook: (() => void) | null) {
     onCloseHook = hook
   }
 
-  /** 当前歌曲加载完成，触发下一首预加载（无缝切歌） */
+  /** 当前歌曲加载完成：兜底再确认一次预加载已就位（正常情况下 PICK/MUSIC 分支已设好） */
   function markLoaded() {
-    firstLoaded = 1
-    if (secondUrl) playerStore.setMusic2({ url: secondUrl })
+    if (secondUrl && playerStore.music2.url !== secondUrl) {
+      playerStore.setMusic2({ url: secondUrl })
+    }
   }
 
   /** 倒计时退出（分钟，0 表示取消） */
@@ -397,20 +488,17 @@ export function useSocket() {
       case MessageType.PICK: {
         if (msg.message === 'goodlist') socketStore.setGood(true)
         playerStore.setPick(msg.data ?? [])
-        // 预加载下一首（无缝切歌）
-        if (msg.data?.length > 1) {
-          secondUrl = msg.data[1].url
-          if (firstLoaded === 1) playerStore.setMusic2({ url: secondUrl })
-        }
+        // 预加载下一首（无缝切歌）：点歌列表一到就预热第二首
+        refreshPreload()
         break
       }
       case MessageType.VOLUMN: {
+        // 服务端下发的音量只影响当前播放，不覆盖本地偏好（本地偏好由用户拖动滑块写入）
         playerStore.setVolume(Number(msg.data))
         break
       }
       case MessageType.MUSIC: {
         playerStore.setLyric('')
-        firstLoaded = 0
         if (msg.data) {
           let url = cleanMusicUrl(msg.data.url)
           msg.data.url = url
@@ -421,6 +509,9 @@ export function useSocket() {
           } else {
             playerStore.setLyrics(parseLyric(msg.data.lyric))
           }
+          // 不能在这里清空预加载：点歌后端是先推 PICK 再推 MUSIC，
+          // 清空会把刚预热的第二首丢掉。改为按当前列表重新预热（URL 走缓存，命中同一地址）
+          refreshPreload()
         }
         break
       }
@@ -499,9 +590,25 @@ export function useSocket() {
     }
   }
 
+  /**
+   * 按当前点歌列表刷新「下一首」预加载。
+   *
+   * 关键点：secondUrl 必须是 cleanMusicUrl 之后、与真正播放时完全一致的地址，
+   * 否则预加载下载的是另一个资源（http/https、域名重写、timestamp 都不同），收益为零。
+   * cleanMusicUrl 内部对原始地址做了短时缓存，因此这里与 MUSIC 分支会得到同一个 URL。
+   */
+  function refreshPreload() {
+    const nextRaw = playerStore.pick?.[1]?.url ?? ''
+    secondUrl = nextRaw ? cleanMusicUrl(nextRaw) : ''
+    playerStore.setMusic2(secondUrl ? { url: secondUrl } : {})
+  }
+
   /** 音乐 URL 清洗（对齐旧代码，处理酷我/网易的地址） */
   function cleanMusicUrl(url: string): string {
     if (!url) return url
+    // 同一原始地址在短时间内复用同一结果：保证「预加载的那一份」就是「即将播放的那一份」
+    const hit = cleanedUrlCache.get(url)
+    if (hit && Date.now() - hit.time < URL_CACHE_TTL) return hit.url
     let result = url
     if (result.indexOf('kuwo.cn') !== -1 && result.indexOf('-') === -1) {
       const urls = result.split('.sycdn.')
@@ -516,7 +623,13 @@ export function useSocket() {
         result = result.replace(/(m\d+?)(?!c)\.music\.126\.net/, '$1c.music.126.net')
       }
     }
-    return result.replace('http://', 'https://')
+    result = result.replace('http://', 'https://')
+    cleanedUrlCache.set(url, { url: result, time: Date.now() })
+    if (cleanedUrlCache.size > URL_CACHE_MAX) {
+      const oldest = cleanedUrlCache.keys().next().value
+      if (oldest !== undefined) cleanedUrlCache.delete(oldest)
+    }
+    return result
   }
 
   /** 按在线人数冒泡排序（对齐旧代码） */
@@ -560,6 +673,7 @@ export function useSocket() {
   return {
     connect,
     disconnect,
+    reconnect,
     setCloseHook,
     setTimeToClose,
     markLoaded,

@@ -179,15 +179,15 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(row, index) in pick" :key="row.id + '-' + index">
+                  <tr v-for="(row, index) in pick" :key="row?.id + '-' + index">
                     <td>{{ index + 1 }}</td>
                     <td>
                       <v-btn
-                        :icon="favoriteMap[row.id] ? 'mdi-heart' : 'mdi-heart-outline'"
+                        :icon="favoriteMap[row?.id] ? 'mdi-heart' : 'mdi-heart-outline'"
                         size="x-small"
-                        :color="favoriteMap[row.id] ? 'red' : 'grey'"
+                        :color="favoriteMap[row?.id] ? 'red' : 'grey'"
                         variant="text"
-                        @click="favoriteMap[row.id] ? removeCollect(row) : collectMusic(row)"
+                        @click="favoriteMap[row?.id] ? removeCollect(row) : collectMusic(row)"
                       />
                       <v-btn
                         v-if="index !== 0 && socketStore.good"
@@ -197,15 +197,15 @@
                         variant="text"
                         @click="goodMusic(row)"
                       />
-                      {{ isAdminView ? row.name + `[${row.id}]` : row.name }}
+                      {{ isAdminView ? row?.name + `[${row?.id}]` : row?.name }}
                     </td>
-                    <td class="text-center">{{ row.artist }}</td>
-                    <td class="text-center">{{ '《' + row.album?.name + '》' }}</td>
+                    <td class="text-center">{{ row?.artist }}</td>
+                    <td class="text-center">{{ row?.album ? '《' + row.album.name + '》' : '' }}</td>
                     <td class="text-center">
                       {{
                         isAdminView
-                          ? row.nickName + (row.sessionId ? `[${row.sessionId}]` : '')
-                          : row.nickName
+                          ? row?.nickName + (row?.sessionId ? `[${row.sessionId}]` : '')
+                          : row?.nickName
                       }}
                     </td>
                   </tr>
@@ -301,13 +301,24 @@
     <audio
       ref="audioEl"
       :src="music.url || undefined"
+      :volume="playerStore.volume / 100"
+      preload="auto"
       autoplay
       @timeupdate="musicTimeUpdate"
+      @loadedmetadata="syncProgressFromPushTime"
       @canplaythrough="markLoaded"
       style="display: none"
     />
-    <!-- 下一首预加载（无缝切歌） -->
-    <audio :src="music2Url || undefined" style="display: none" />
+    <!-- 下一首预加载：点歌列表一更新就预热第二首（URL 与随后播放的完全一致，从而命中缓存）。
+         这里只负责「预热」，播放仍由服务端 MUSIC 推送驱动——不能在此接续播放，
+         因为后端播完 ~500ms 内必推下一首，本地抢先切换会造成重复播放/单曲循环播错歌。 -->
+    <audio
+      ref="preloadEl"
+      :src="music2Url || undefined"
+      :volume="playerStore.volume / 100"
+      preload="auto"
+      style="display: none"
+    />
   </div>
 </template>
 
@@ -375,6 +386,7 @@ const albumRotateSize = computed(() => {
   return 200
 })
 const audioEl = ref<HTMLAudioElement | null>(null)
+const preloadEl = ref<HTMLAudioElement | null>(null)
 
 const music = computed(() => playerStore.music)
 const pick = computed(() => playerStore.pick)
@@ -400,10 +412,18 @@ const homeHouse = computed(() => houseStore.homeHouse)
 const volume = computed({
   get: () => playerStore.volume,
   set: (v: number) => {
-    playerStore.setVolume(v)
-    if (audioEl.value) audioEl.value.volume = v / 100
+    // 只改本地：后端 /music/volumn 需要管理员权限且是向全房间广播，普通用户拖滑块不应触发
+    playerStore.setLocalVolume(v)
+    applyVolume()
+    // 预加载的第二首也要同步音量，否则接续播放时会突然变响
+    if (preloadEl.value) preloadEl.value.volume = v / 100
   },
 })
+
+/** 把当前音量应用到 audio 元素（volume 是 IDL 属性，必须用 JS 赋值） */
+function applyVolume() {
+  if (audioEl.value) audioEl.value.volume = playerStore.volume / 100
+}
 
 const pickHistory = ref<Music[]>(JSON.parse(localStorage.getItem('pickHistory') || '[]'))
 const favoriteMap = ref<Record<string, Music>>(JSON.parse(localStorage.getItem('collectMusic') || '{}'))
@@ -548,21 +568,38 @@ function musicTimeUpdate(e: Event) {
   playerStore.setTime(`${secondsToHH_mm_ss(current)} / ${secondsToHH_mm_ss(duration)}`)
 }
 
-// 音乐切换时：重新播放 + 进度校准
+/** 音频元数据就绪：按服务端 pushTime 校准进度（中途进房/断线重连后追上房间进度） */
+function syncProgressFromPushTime() {
+  const audio = audioEl.value
+  const m = playerStore.music
+  if (!audio || !m.pushTime) return
+  const offset = (Date.now() - m.pushTime) / 1000
+  // 刚开播（<=3s）不校准
+  if (offset <= 3) return
+  const duration = audio.duration
+  if (Number.isFinite(duration) && duration > 0) {
+    // 数据过旧或已超出时长就不跳，避免跳到末尾立刻 ended
+    if (offset >= duration - 1) return
+  } else if (offset > 3600) {
+    // duration 还不可用（NaN/Infinity）时给个兜底上限
+    return
+  }
+  audio.currentTime = offset
+}
+
+// 音乐切换时：重新播放 + 唱片转动
+let rotateTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   () => playerStore.music.url,
   () => {
     albumRotate.value = false
-    if (audioEl.value) {
-      audioEl.value.volume = playerStore.volume / 100
-      audioEl.value.play().catch(() => {})
-    }
-    setTimeout(() => {
+    applyVolume()
+    if (audioEl.value) audioEl.value.play().catch(() => {})
+    // 进度校准不放在这里：pushTime 需要等音频元数据就绪，交给 loadedmetadata
+    if (rotateTimer) clearTimeout(rotateTimer)
+    rotateTimer = setTimeout(() => {
+      rotateTimer = null
       albumRotate.value = true
-      const m = playerStore.music
-      if (m.pushTime && audioEl.value) {
-        audioEl.value.currentTime = (Date.now() - m.pushTime) / 1000
-      }
     }, 1000)
   },
 )
@@ -589,10 +626,14 @@ function getUrlKey(name: string): string {
 }
 
 onMounted(() => {
-  // 解决部分移动端不能自动播放
+  // 首屏就按本地偏好对齐音量（否则 audio 默认 100%，与滑块显示不一致）
+  applyVolume()
+
+  // 解决部分移动端不能自动播放（只影响首曲，切歌后的播放由 watch 负责）
   document.addEventListener(
     'touchstart',
     () => {
+      applyVolume()
       audioEl.value?.play().catch(() => {})
     },
     { once: true },
@@ -622,7 +663,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // 组件卸载时断开连接（可选，保留连接复用）
+  // 释放模块级单例上的闭包与本地定时器，避免组件反复挂载后残留旧引用
+  setCloseHook(null)
+  if (rotateTimer) {
+    clearTimeout(rotateTimer)
+    rotateTimer = null
+  }
 })
 </script>
 
