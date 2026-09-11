@@ -307,6 +307,7 @@
       @timeupdate="musicTimeUpdate"
       @loadedmetadata="syncProgressFromPushTime"
       @canplaythrough="markLoaded"
+      @ended="onAudioEnded"
       style="display: none"
     />
     <!-- 下一首预加载：点歌列表一更新就预热第二首（URL 与随后播放的完全一致，从而命中缓存）。
@@ -587,14 +588,83 @@ function syncProgressFromPushTime() {
   audio.currentTime = offset
 }
 
+/**
+ * 「播完兜底」。
+ *
+ * 后端（MusicJob，每 500ms 一次）靠 `pushTime + duration` 自己算播放是否结束，
+ * 完全不依赖前端上报。而音源 API 给的 duration 常有偏差（为 null 时后端直接按 5 分钟算），
+ * 于是会出现「歌已经播完、界面却卡住不切」。
+ *
+ * 这里在 ended 之后给 3 秒宽限：后端仍未推来才本地接续。之所以不立刻接续，
+ * 是因为后端通常就在这几百毫秒内推送，立刻接续会与之撞车。
+ */
+let endedFallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearEndedFallback() {
+  if (endedFallbackTimer) {
+    clearTimeout(endedFallbackTimer)
+    endedFallbackTimer = null
+  }
+}
+
+function onAudioEnded() {
+  clearEndedFallback()
+  endedFallbackTimer = setTimeout(() => {
+    endedFallbackTimer = null
+    playNextFromQueue()
+  }, 3000)
+}
+
+/**
+ * 本地接续待播队列的下一首。
+ * 后端 getPickList 返回的列表中 pick[0] 是「正在播放」、pick[1] 才是下一首，
+ * 与后端 musicSwitch → pickToPlaying 取的是同一首。
+ */
+function playNextFromQueue() {
+  const next = playerStore.pick?.[1]
+  const url = music2Url.value
+  // 没有下一首、或地址与当前相同（单曲循环）时不接续，交给后端推送
+  if (!next || !url || url === playerStore.music.url) return
+  // 用完整对象接续，保证歌名/封面/歌词正确；pushTime 取当前时间，
+  // 否则 loadedmetadata 的进度校准会按旧推送时间把进度跳到接近结尾
+  playerStore.setMusic({ ...next, url, pushTime: Date.now() })
+}
+
 // 音乐切换时：重新播放 + 唱片转动
 let rotateTimer: ReturnType<typeof setTimeout> | null = null
+/** 上一次真正播放过的地址，用于识别「同一首歌被再次推送」（单曲循环） */
+let lastPlayedUrl = ''
+
 watch(
-  () => playerStore.music.url,
+  // 监听整个 music 对象而不是 url：单曲循环时后端推的是同一首、url 完全相同，
+  // 只监听 url 的话回调不会触发，就会出现「播完停住」。
+  () => playerStore.music,
   () => {
+    // 后端已推来新歌，取消「播完兜底」
+    clearEndedFallback()
     albumRotate.value = false
     applyVolume()
-    if (audioEl.value) audioEl.value.play().catch(() => {})
+    const audio = audioEl.value
+    const url = playerStore.music.url
+    if (audio) {
+      // 同一地址再次推送有两种情况，必须区分：
+      //   ① 单曲循环：音频确实已播完 → 回到开头重播
+      //   ② 本地兜底刚接续、后端随后补推同一首 → 音频正在播，绝不能打断它
+      if (url && url === lastPlayedUrl) {
+        const finished =
+          Number.isFinite(audio.duration) && audio.duration > 0 && audio.currentTime >= audio.duration - 1
+        if (finished) {
+          try {
+            audio.currentTime = 0
+          } catch {
+            /* 元数据未就绪时忽略 */
+          }
+        }
+      }
+      lastPlayedUrl = url
+      // flush: 'post' 保证此时 DOM 的 src 已更新，play() 作用在新资源上
+      audio.play().catch(() => {})
+    }
     // 进度校准不放在这里：pushTime 需要等音频元数据就绪，交给 loadedmetadata
     if (rotateTimer) clearTimeout(rotateTimer)
     rotateTimer = setTimeout(() => {
@@ -602,6 +672,7 @@ watch(
       albumRotate.value = true
     }, 1000)
   },
+  { flush: 'post' },
 )
 
 // 记录点歌历史
@@ -665,6 +736,7 @@ onMounted(() => {
 onUnmounted(() => {
   // 释放模块级单例上的闭包与本地定时器，避免组件反复挂载后残留旧引用
   setCloseHook(null)
+  clearEndedFallback()
   if (rotateTimer) {
     clearTimeout(rotateTimer)
     rotateTimer = null
