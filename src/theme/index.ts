@@ -43,7 +43,10 @@ export function syncVuetifyTheme() {
       theme.themes.value.light.colors = lightTheme.colors
       theme.themes.value.light.variables = lightTheme.variables
 
-      theme.global.name.value = dark ? 'dark' : 'light'
+      // 用 change() 而不是 theme.global.name.value = ...：
+      // 后者在 Vuetify 4 已弃用，会打印 [Vuetify UPGRADE] 警告。
+      // 未开启 transition 时 change() 内部同步生效，行为与直接赋值一致。
+      void theme.change(dark ? 'dark' : 'light')
     },
     { immediate: true },
   )

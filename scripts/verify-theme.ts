@@ -9,6 +9,7 @@
  *     --outfile=.theme-check.mjs && node .theme-check.mjs && rm .theme-check.mjs
  */
 import { readFileSync } from 'node:fs'
+import { createTheme } from 'vuetify/lib/composables/theme.js'
 import { DEFAULT_SEED, md3Colors, md3Theme } from '../src/theme/md3'
 
 let failed = 0
@@ -215,6 +216,54 @@ check(
   missingClasses.length === 0,
   missingClasses.length ? `缺失: ${missingClasses.join(', ')}` : `${MD3_TYPE_CLASSES.length} 个`,
 )
+
+// ---------- 热更新机制（在 Node 内驱动 Vuetify theme，无需浏览器）----------
+// Vuetify 的 theme 是响应式的：styles 是由 themes 派生的 computed。
+// 这里直接驱动它，验证「改 colors / 切主题名 → CSS 变量重算」这条路径本身成立，
+// 从而把"运行时切换能生效"从源码推断变成可复现的观测。
+console.log()
+console.log('=== 热更新机制 ===')
+
+const theme = createTheme({
+  defaultTheme: 'dark',
+  variations: false,
+  themes: {
+    dark: { dark: true, ...md3Theme(DEFAULT_SEED, true) },
+    light: { dark: false, ...md3Theme(DEFAULT_SEED, false) },
+  },
+})
+
+/** 取 :root 块中当前生效主题的 primary（:root 始终是当前主题的值） */
+function rootPrimary(css: string): string | undefined {
+  const root = css.slice(css.indexOf(':root'), css.indexOf('.v-theme--'))
+  return (root.match(/--v-theme-primary:\s*([^;]+)/) || [])[1]
+}
+
+const s0 = theme.styles.value
+check('theme.styles 产出 CSS', s0.length > 10_000, `${s0.length} 字符`)
+check('其中含 MD3 角色 primary-container', s0.includes('--v-theme-primary-container'))
+check('其中含 MD3 令牌 elevation-overlay-color', s0.includes('--v-elevation-overlay-color'))
+check('其中含 shape 令牌', s0.includes('--v-shape-lg'))
+check('其中含状态层令牌', s0.includes('--v-hover-opacity'))
+
+// 改 colors 必须触发重算——这是动态取色与主题切换共用的路径
+theme.themes.value.dark.colors = md3Theme('#6750A4', true).colors
+const s1 = theme.styles.value
+check(
+  '改 colors 触发 CSS 重算（热更新）',
+  s0 !== s1 && rootPrimary(s0) !== rootPrimary(s1),
+  `${rootPrimary(s0)} → ${rootPrimary(s1)}`,
+)
+
+// 切主题名必须换到另一套值
+void theme.change('light')
+const s2 = theme.styles.value
+check('切主题名切换到浅色配色', rootPrimary(s2) !== rootPrimary(s1), `light primary = ${rootPrimary(s2)}`)
+
+// tonal elevation 的叠加色必须跟着 seed 走
+const tintA = md3Theme('#009688', true).variables['elevation-overlay-color']
+const tintB = md3Theme('#6750A4', true).variables['elevation-overlay-color']
+check('elevation 叠加色随 seed 变化', tintA !== tintB, `${tintA} → ${tintB}`)
 
 console.log()
 if (failed) {
