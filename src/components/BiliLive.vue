@@ -24,7 +24,7 @@
           {{ connected ? '断开连接' : '连接直播间' }}
         </v-btn>
 
-        <div class="text-caption text-grey mt-4">
+        <div class="text-caption on-surface-variant mt-4">
           <div>1. 弹幕发送「点歌 歌曲名」即可点歌（默认网易云）</div>
           <div>2. 弹幕发送「点歌qq 歌曲名」切换到 QQ 曲源</div>
           <div>3. 弹幕发送「切歌」或「投票切歌」发起投票切歌</div>

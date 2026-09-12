@@ -113,11 +113,19 @@ function extraTones(seed: string, dark: boolean) {
 }
 
 /**
- * 由 seed 生成一套完整的 MD3 颜色角色表。
+ * 由 seed 生成一套完整的 MD3 主题（颜色角色 + 设计令牌）。
+ *
+ * 颜色与令牌一并产出，是因为 MD3 的「高度」也依赖色调：
+ * tonal elevation 要求抬升的表面叠加 surface-tint（由 primary 派生），而非中性黑白。
+ * 两者必须来自同一个 SchemeTonalSpot，顺带也只需计算一次。
+ *
  * @param seed 十六进制种子色（如 #009688）
  * @param dark 是否深色模式
  */
-export function md3Colors(seed: string, dark: boolean): Md3Colors {
+export function md3Theme(
+  seed: string,
+  dark: boolean,
+): { colors: Md3Colors; variables: Record<string, string | number> } {
   const source = normalizeSeed(seed)
   const scheme = new SchemeTonalSpot(Hct.fromInt(argbFromHex(source)), dark, 0)
 
@@ -139,35 +147,39 @@ export function md3Colors(seed: string, dark: boolean): Md3Colors {
     colors[`on-${name}`] = on
   }
 
-  return colors as Md3Colors
-}
-
-/**
- * MD3 状态层与形状令牌。
- *
- * 这些走 Vuetify 的 theme.variables，渲染为 `--v-<key>`（注意不带 theme- 前缀）。
- * 状态层透明度取 MD3 规范值（hover 8% / focus 10% / pressed 10% / dragged 16%），
- * 而 Vuetify 默认是 MD2 的 4%/12%/16%，必须覆写。
- *
- * 形状采用 MD3 shape scale：4 / 8 / 12 / 16 / 28，供组件样式以 var(--v-shape-*) 消费。
- */
-export function md3Variables(dark: boolean): Record<string, string | number> {
-  return {
+  const variables: Record<string, string | number> = {
     // —— 状态层（MD3 state layer opacities）——
+    // MD3 规范为 hover 8% / focus 10% / pressed 10% / dragged 16%；
+    // Vuetify 默认是 MD2 的 4% / 12% / 16%，必须覆写。
     'hover-opacity': 0.08,
     'focus-opacity': 0.1,
     'pressed-opacity': 0.1,
     'dragged-opacity': 0.16,
     'selected-opacity': 0.08,
     'activated-opacity': 0.1,
-    // —— 形状（MD3 shape scale）——
+    // MD3 disabled 内容不透明度
+    'disabled-opacity': 0.38,
+    // —— 形状（MD3 shape scale：4 / 8 / 12 / 16 / 28）——
     'shape-none': '0px',
     'shape-xs': '4px',
     'shape-sm': '8px',
     'shape-md': '12px',
     'shape-lg': '16px',
     'shape-xl': '28px',
-    // —— MD3 的 disabled 内容不透明度 ——
-    'disabled-opacity': dark ? 0.38 : 0.38,
+    // —— 高度（MD3 tonal elevation）——
+    // Vuetify 的 .elevation-N 通过
+    //   color-mix(in srgb, var(--v-elevation-overlay-color) N%, transparent)
+    // 叠加到表面上，默认叠的是中性黑/白。MD3 要求叠 surface-tint，
+    // 这样抬升的表面会带主色倾向而非单纯变亮/变暗。
+    // 阴影本身无需干预：Vuetify 4 的 $shadow-key / $shadow-ambient 已是 MD3 官方规格
+    // （0 1px 2px 0 / 0 1px 3px 1px …，key/ambient 透明度 0.30/0.15）。
+    'elevation-overlay-color': hexFromArgb(MaterialDynamicColors.surfaceTint.getArgb(scheme)),
   }
+
+  return { colors: colors as Md3Colors, variables }
+}
+
+/** 只需要颜色角色时的便捷入口 */
+export function md3Colors(seed: string, dark: boolean): Md3Colors {
+  return md3Theme(seed, dark).colors
 }

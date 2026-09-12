@@ -66,8 +66,23 @@ const READ_STATE = `JSON.stringify((() => {
   const vars = {}
   for (const n of names) vars[n] = cs.getPropertyValue('--v-theme-' + n).trim()
   const app = document.querySelector('.v-application')
+
+  // 排版：插入探针元素读计算后的字号。
+  // Vuetify 4 不提供 .text-h5 等类，若未自补则元素只会继承默认字号。
+  const typo = {}
+  for (const cls of ['text-h5', 'text-body-2', 'text-caption']) {
+    const el = document.createElement('div')
+    el.className = cls
+    document.body.appendChild(el)
+    const c = getComputedStyle(el)
+    typo[cls] = c.fontSize + ' / ' + c.lineHeight
+    el.remove()
+  }
+
   return {
     vars,
+    typo,
+    elevationOverlay: cs.getPropertyValue('--v-elevation-overlay-color').trim(),
     themeClass: app ? app.className : null,
     appBg: app ? getComputedStyle(app).backgroundColor : null,
     bodyBg: getComputedStyle(document.body).backgroundColor,
@@ -147,6 +162,16 @@ ws.addEventListener('open', async () => {
     check('Vuetify 遗留角色 surface-light 有值', !!dark.vars['surface-light'], dark.vars['surface-light'])
     check('组件消费的 on-surface-light / on-surface-bright 有值',
       !!dark.vars['on-surface-light'] && !!dark.vars['on-surface-bright'])
+
+    // 排版类必须真的生效：Vuetify 4 移除了 .text-h5 等类，未自补时这里只会是继承的默认字号
+    console.log('--- 排版探针 ---')
+    for (const [cls, v] of Object.entries(dark.typo)) console.log(`  .${cls} → ${v}`)
+    check('.text-h5 = 24px（MD3 headline-small）', dark.typo['text-h5'].startsWith('24px'), dark.typo['text-h5'])
+    check('.text-body-2 = 14px（MD3 body-medium）', dark.typo['text-body-2'].startsWith('14px'), dark.typo['text-body-2'])
+    check('.text-caption = 12px（MD3 body-small）', dark.typo['text-caption'].startsWith('12px'), dark.typo['text-caption'])
+
+    // MD3 tonal elevation：叠加色应为 surface-tint 而非中性黑白
+    check('elevation-overlay-color 已设为 surface-tint', !!dark.elevationOverlay, dark.elevationOverlay)
 
     const darkShot = await send('browsingContext.captureScreenshot', { context: contextId })
     const fs = await import('node:fs')

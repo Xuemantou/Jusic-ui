@@ -11,16 +11,16 @@
 
       <v-card-text class="text-center">
         <div class="text-subtitle-1 mb-2">{{ houseStore.musichouse }}</div>
-        <div v-if="homeDesc" class="text-caption text-grey mb-3">{{ homeDesc }}</div>
+        <div v-if="homeDesc" class="text-caption on-surface-variant mb-3">{{ homeDesc }}</div>
 
         <v-img v-if="qrcodeDataUrl" :src="qrcodeDataUrl" width="250" height="250" class="mx-auto" />
 
         <div v-if="miniQrcode" class="mt-4">
-          <div class="text-caption text-grey mb-2">小程序码</div>
+          <div class="text-caption on-surface-variant mb-2">小程序码</div>
           <v-img :src="miniQrcode" width="200" class="mx-auto" />
         </div>
 
-        <div class="text-caption text-grey mt-4 text-truncate">{{ shareUrl }}</div>
+        <div class="text-caption on-surface-variant mt-4 text-truncate">{{ shareUrl }}</div>
       </v-card-text>
 
       <v-card-actions>

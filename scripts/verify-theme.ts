@@ -8,7 +8,8 @@
  *   npx esbuild scripts/verify-theme.ts --bundle --format=esm --platform=node \
  *     --outfile=.theme-check.mjs && node .theme-check.mjs && rm .theme-check.mjs
  */
-import { DEFAULT_SEED, md3Colors } from '../src/theme/md3'
+import { readFileSync } from 'node:fs'
+import { DEFAULT_SEED, md3Colors, md3Theme } from '../src/theme/md3'
 
 let failed = 0
 
@@ -113,6 +114,71 @@ check('非法 seed 回退到默认配色', fallback.primary === teal.primary)
 // MD2 遗留键必须被覆盖掉，否则会残留 #1F5592 之类的旧蓝色
 check('MD2 遗留变体键已覆盖为 MD3 值', teal['primary-darken-1'] === teal.primary, teal['primary-darken-1'])
 check('surface-light 已映射（组件依赖）', teal['surface-light'] === teal['surface-container-high'])
+
+// ---------- 设计令牌：高度 / 状态层 / 形状 ----------
+console.log()
+console.log('=== 设计令牌 ===')
+
+const { colors: darkColors, variables: darkVars } = md3Theme(DEFAULT_SEED, true)
+const { variables: lightVars } = md3Theme(DEFAULT_SEED, false)
+
+// MD3 tonal elevation：抬升表面叠加 surface-tint，而不是中性黑白
+check(
+  'elevation-overlay-color = surface-tint（tonal elevation）',
+  darkVars['elevation-overlay-color'] === darkColors['surface-tint'],
+  String(darkVars['elevation-overlay-color']),
+)
+check(
+  '明暗两侧 elevation 叠加色不同（随主题色调走）',
+  darkVars['elevation-overlay-color'] !== lightVars['elevation-overlay-color'],
+)
+
+// MD3 规范：hover 8% / focus 10% / pressed 10% / dragged 16%
+check(
+  '状态层透明度为 MD3 规范值',
+  darkVars['hover-opacity'] === 0.08 &&
+    darkVars['focus-opacity'] === 0.1 &&
+    darkVars['pressed-opacity'] === 0.1 &&
+    darkVars['dragged-opacity'] === 0.16,
+  `hover=${darkVars['hover-opacity']} pressed=${darkVars['pressed-opacity']}`,
+)
+
+// MD3 shape scale: 4 / 8 / 12 / 16 / 28
+const SHAPE_TOKENS = ['shape-xs', 'shape-sm', 'shape-md', 'shape-lg', 'shape-xl']
+check('shape scale 令牌齐全', SHAPE_TOKENS.every(k => k in darkVars))
+check(
+  'shape scale 严格递增',
+  // 令牌值是 '4px' 这类字符串，必须 parseFloat，Number('4px') 会得到 NaN
+  SHAPE_TOKENS.map(k => parseFloat(String(darkVars[k]))).every((v, i, arr) => i === 0 || arr[i - 1] < v),
+  SHAPE_TOKENS.map(k => `${k}=${darkVars[k]}`).join(' '),
+)
+
+// ---------- 设计令牌：排版 ----------
+// 脚本经 esbuild 打包后 import.meta.url 指向产物（node_modules/.cache/），
+// 故用 cwd 解析源码路径——npm script 从项目根运行
+const typoCss = readFileSync('src/styles/typography.css', 'utf8')
+
+// 定义了却没人引用的令牌就是死代码
+const declaredTokens = [...typoCss.matchAll(/^\s*(--v-type-[a-z-]+):/gm)].map(m => m[1])
+const unusedTokens = declaredTokens.filter(name => !typoCss.includes(`var(${name})`))
+check(
+  `排版令牌全部被引用（共 ${declaredTokens.length} 个）`,
+  unusedTokens.length === 0,
+  unusedTokens.length ? `未引用: ${unusedTokens.join(', ')}` : '',
+)
+
+// Vuetify 4 已移除这些类，必须自补，否则项目里 8 处用法静默失效
+const MD3_TYPE_CLASSES = [
+  'text-h1', 'text-h2', 'text-h3', 'text-h4', 'text-h5', 'text-h6',
+  'text-subtitle-1', 'text-subtitle-2', 'text-body-1', 'text-body-2',
+  'text-caption', 'text-button', 'text-overline',
+]
+const missingClasses = MD3_TYPE_CLASSES.filter(c => !typoCss.includes(`.${c}`))
+check(
+  'Vuetify 兼容排版类齐全',
+  missingClasses.length === 0,
+  missingClasses.length ? `缺失: ${missingClasses.join(', ')}` : `${MD3_TYPE_CLASSES.length} 个`,
+)
 
 console.log()
 if (failed) {

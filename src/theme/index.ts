@@ -1,9 +1,9 @@
 import { watch } from 'vue'
 import { useTheme } from 'vuetify'
-import { md3Colors } from './md3'
+import { md3Theme } from './md3'
 import { activeSeed, isDark } from './state'
 
-export { DEFAULT_SEED, md3Colors, md3Variables } from './md3'
+export { DEFAULT_SEED, md3Colors, md3Theme } from './md3'
 export { extractSeed } from './extractSeed'
 export {
   activeSeed,
@@ -21,7 +21,9 @@ export {
  *
  * 两条同步路径：
  *   - 明暗模式 → 切换 theme 名（dark / light）
- *   - seed 变化 → 重建两个主题的全部颜色角色
+ *   - seed 变化 → 重建两个主题的全部颜色角色与令牌
+ *
+ * 令牌也要一起重建：MD3 的 tonal elevation 叠加色派生自 seed，换配色时它必须跟着换。
  *
  * 二者都通过 Vuetify 的 theme 响应式对象生效：styles 是 computed，
  * 变更后 Vuetify 会重新生成 CSS 变量并写回 <style id="vuetify-theme-stylesheet">，
@@ -33,8 +35,14 @@ export function syncVuetifyTheme() {
   watch(
     [activeSeed, isDark],
     ([seed, dark]) => {
-      theme.themes.value.dark.colors = md3Colors(seed, true)
-      theme.themes.value.light.colors = md3Colors(seed, false)
+      const darkTheme = md3Theme(seed, true)
+      const lightTheme = md3Theme(seed, false)
+
+      theme.themes.value.dark.colors = darkTheme.colors
+      theme.themes.value.dark.variables = darkTheme.variables
+      theme.themes.value.light.colors = lightTheme.colors
+      theme.themes.value.light.variables = lightTheme.variables
+
       theme.global.name.value = dark ? 'dark' : 'light'
     },
     { immediate: true },

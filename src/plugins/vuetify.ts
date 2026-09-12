@@ -3,7 +3,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import 'vuetify/styles'
 import '@mdi/font/css/materialdesignicons.css'
-import { DEFAULT_SEED, md3Colors, md3Variables } from '@/theme/md3'
+import { DEFAULT_SEED, md3Theme } from '@/theme/md3'
 
 /**
  * Material You（Material Design 3）主题
@@ -31,13 +31,11 @@ const vuetify = createVuetify({
     themes: {
       dark: {
         dark: true,
-        colors: md3Colors(DEFAULT_SEED, true),
-        variables: md3Variables(true),
+        ...md3Theme(DEFAULT_SEED, true),
       },
       light: {
         dark: false,
-        colors: md3Colors(DEFAULT_SEED, false),
-        variables: md3Variables(false),
+        ...md3Theme(DEFAULT_SEED, false),
       },
     },
   },

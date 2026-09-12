@@ -99,8 +99,13 @@ cd .. && mvn clean package -DskipTests
 - **实现要点**：颜色角色表由 `MaterialDynamicColors` **枚举生成**而非手写映射，库升级时自动跟进、
   不会漏项。运行时切换靠改 `theme.themes.value.*.colors`——Vuetify 的 `styles` 是 computed，
   变更后会重新生成 CSS 变量并写回 `<style id="vuetify-theme-stylesheet">`，故无需刷新页面。
-- **状态层与形状**：MD3 规范值（hover 8% / focus 10% / pressed 10% / dragged 16%）与
-  shape scale（`--v-shape-xs/sm/md/lg/xl` = 4/8/12/16/28）走 Vuetify 的 `theme.variables`。
+- **状态层**：MD3 规范值（hover 8% / focus 10% / pressed 10% / dragged 16%），走 Vuetify 的 `theme.variables`。
+- **形状**：MD3 shape scale（`--v-shape-xs/sm/md/lg/xl` = 4 / 8 / 12 / 16 / 28）。
+- **高度**：Vuetify 4 的阴影规格（`$shadow-key` / `$shadow-ambient`）已与 MD3 spec 逐条一致，
+  无需干预；真正缺的是 **tonal elevation**——MD3 要求抬升表面叠加 `surface-tint`（由 primary 派生）
+  而非中性黑白，故把 `--v-elevation-overlay-color` 设为 `surface-tint`，并随 seed 一起重建。
+- **排版**：`src/styles/typography.css` 按 MD3 type scale 补齐 `.text-h1` ~ `.text-caption` 等类，
+  尺寸与行高抽成 `--v-type-*` 令牌（30 个）。**Vuetify 4 已移除这些工具类**，详见踩坑表。
 
 ## 功能对照
 
@@ -134,6 +139,9 @@ cd .. && mvn clean package -DskipTests
 | 组件样式莫名塌掉 | Vuetify 组件内部仍引用 MD2 遗留角色——`surface-light`（24 处）、`on-surface-light`、`on-surface-bright`，MD3 规范里没有，必须显式映射到最接近的角色，否则静默取到空值 |
 | 给 `theme.colors` 赋值报类型错 | Vuetify 的 `Colors` 接口未对外导出，且 `Record<string, string>` 无法向 TS 证明含必需字段；给返回值标一个精确的交叉类型即可结构化匹配，无需 `as` |
 | `Cannot find module .../dynamic_color` | `material-color-utilities` 0.4.0 的 `color_spec_2025.js` 漏写 `.js` 扩展名（同文件其他 import 都有）。Vite/Rolldown 会补扩展名，只有 Node 原生 ESM 会失败，故校验脚本先经 esbuild 打包再跑 |
+| `class="text-h5"` 毫无效果 | Vuetify 4 **移除了全部排版工具类**——`.text-h1` ~ `.text-caption`、`.text-body-*` 在 `vuetify/lib/styles/main.css` 里 grep 计数为 0。本项目沿用这些类名，导致它们此前静默失效（文字尺寸只受继承影响）。需按 MD3 type scale 自行补齐（`src/styles/typography.css`） |
+| 自定义 `on-*` 颜色类名不对 | Vuetify 为普通角色生成 `.text-<key>`，但对 `on-` 前缀**只生成 `.on-<key>`**（`theme.js:250` 走的是另一个分支），所以应写 `class="on-surface-variant"` 而非 `text-on-surface-variant` |
+| 定义了令牌却没人用 | `npm run verify:theme` 会检查 `--v-type-*` 是否都被引用。MD3 共 15 个排版类别而 Vuetify 类名只覆盖 13 个，缺的 `display-medium` / `label-medium` 需单独命名，否则令牌变死代码 |
 
 ## 目录结构
 
