@@ -9,6 +9,7 @@
  *     --outfile=.theme-check.mjs && node .theme-check.mjs && rm .theme-check.mjs
  */
 import { readFileSync } from 'node:fs'
+import { Hct, argbFromHex, hexFromArgb } from '@material/material-color-utilities'
 import { createTheme } from 'vuetify/lib/composables/theme.js'
 import { DEFAULT_SEED, md3Colors, md3Theme } from '../src/theme/md3'
 
@@ -107,6 +108,55 @@ const teal = md3Colors('#009688', true)
 const purple = md3Colors('#6750A4', true)
 check('换 seed 会改变配色（动态取色的前提）', teal.primary !== purple.primary, `${teal.primary} vs ${purple.primary}`)
 check('换 seed 后 on-primary 仍达标', contrast(purple['on-primary'], purple.primary) >= 4.5, contrast(purple['on-primary'], purple.primary).toFixed(2))
+
+// ---------- 配色安全性：任意色相的 seed 都必须可读 ----------
+// 动态取色的 seed 来自用户背景图，可能是任何色相。MD3 的价值正在于
+// 对比度由色调差保证，因此这里遍历色相环做回归——只要这个断言成立，
+// 「用户换一张图导致界面不可读」就不可能发生。
+console.log()
+console.log('=== 任意 seed 的配色安全性 ===')
+
+const HUE_SAMPLES = 24
+let worstPrimary = Infinity
+let worstPrimaryAt = ''
+let worstSurface = Infinity
+let unreadable = 0
+
+for (let i = 0; i < HUE_SAMPLES; i++) {
+  const hue = (360 / HUE_SAMPLES) * i
+  const seed = hexFromArgb(Hct.from(hue, 48, 50).toInt())
+
+  for (const dark of [true, false]) {
+    const c = md3Colors(seed, dark)
+    const p = contrast(c['on-primary'], c.primary)
+    const s = contrast(c['on-surface'], c.surface)
+    if (p < worstPrimary) {
+      worstPrimary = p
+      worstPrimaryAt = `${seed} / ${dark ? 'dark' : 'light'}`
+    }
+    worstSurface = Math.min(worstSurface, s)
+    if (p < 4.5) unreadable++
+    if (s < 4.5) unreadable++
+  }
+}
+
+check(
+  `${HUE_SAMPLES} 个色相 × 明暗共 ${HUE_SAMPLES * 2} 套配色：正文对比度全部 ≥ 4.5`,
+  unreadable === 0,
+  `最差 on-primary ${worstPrimary.toFixed(2)} @ ${worstPrimaryAt}；最差 on-surface ${worstSurface.toFixed(2)}`,
+)
+
+// seed 来自图片，还可能是极端明暗或低饱和色
+const EXTREME_SEEDS = ['#000000', '#ffffff', '#808080', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff']
+let extremeBad = 0
+for (const seed of EXTREME_SEEDS) {
+  for (const dark of [true, false]) {
+    const c = md3Colors(seed, dark)
+    if (contrast(c['on-primary'], c.primary) < 4.5) extremeBad++
+    if (contrast(c['on-surface'], c.surface) < 4.5) extremeBad++
+  }
+}
+check(`极端 seed（纯黑/纯白/灰/纯色）共 ${EXTREME_SEEDS.length * 2} 套仍可读`, extremeBad === 0, `不达标 ${extremeBad} 项`)
 
 // 非法 seed 必须安全回退，不能让界面崩掉
 const fallback = md3Colors('not-a-color', true)
