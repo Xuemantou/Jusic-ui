@@ -592,11 +592,14 @@ function syncProgressFromPushTime() {
  * 「播完兜底」。
  *
  * 后端（MusicJob，每 500ms 一次）靠 `pushTime + duration` 自己算播放是否结束，
- * 完全不依赖前端上报。而音源 API 给的 duration 常有偏差（为 null 时后端直接按 5 分钟算），
- * 于是会出现「歌已经播完、界面却卡住不切」。
+ * 完全不依赖前端上报。而音源 API 返回的 duration 是**完整歌曲**时长：
+ * 没配会员 cookie 时实际只能拿到试听片段（约 30 秒），于是歌早播完了、
+ * 后端却还要等完整时长到点才推下一首 —— 表现为「播完卡住不切」。
  *
- * 这里在 ended 之后给 3 秒宽限：后端仍未推来才本地接续。之所以不立刻接续，
- * 是因为后端通常就在这几百毫秒内推送，立刻接续会与之撞车。
+ * 处理策略（宽限期按是否试听片段区分）：
+ *   ① 待播队列里有下一首 → 本地直接接续，不必打扰后端；
+ *   ② 队列为空（下一首由后端从默认歌单随机挑，前端无法预知）→ 请后端切歌。
+ * 正常歌曲仍给 3 秒宽限，等后端自己的推送，避免与之撞车。
  */
 let endedFallbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -607,27 +610,50 @@ function clearEndedFallback() {
   }
 }
 
+/**
+ * 判断当前播放的是否为「试听片段」。
+ * 后端记录的时长明显长于音频实际时长时即可判定 —— 这种情况后端要等很久才会推下一首，
+ * 不必再等满宽限期。
+ */
+function isClipPlaying(): boolean {
+  const audio = audioEl.value
+  const claimed = Number(playerStore.music.duration || 0) / 1000
+  const actual = audio && Number.isFinite(audio.duration) ? audio.duration : 0
+  return claimed > 0 && actual > 0 && claimed - actual > 15
+}
+
 function onAudioEnded() {
   clearEndedFallback()
-  endedFallbackTimer = setTimeout(() => {
-    endedFallbackTimer = null
-    playNextFromQueue()
-  }, 3000)
+  const clip = isClipPlaying()
+  endedFallbackTimer = setTimeout(
+    () => {
+      endedFallbackTimer = null
+      // ① 队列里有下一首 → 本地接续
+      if (playNextFromQueue()) return
+      // ② 队列为空：下一首要由后端挑，只能请它切
+      if (clip) {
+        send('/music/skip/vote')
+        toast.info('试听片段已播完，已请求切歌')
+      }
+    },
+    clip ? 300 : 3000,
+  )
 }
 
 /**
- * 本地接续待播队列的下一首。
+ * 本地接续待播队列的下一首，接续成功返回 true。
  * 后端 getPickList 返回的列表中 pick[0] 是「正在播放」、pick[1] 才是下一首，
  * 与后端 musicSwitch → pickToPlaying 取的是同一首。
  */
-function playNextFromQueue() {
+function playNextFromQueue(): boolean {
   const next = playerStore.pick?.[1]
   const url = music2Url.value
   // 没有下一首、或地址与当前相同（单曲循环）时不接续，交给后端推送
-  if (!next || !url || url === playerStore.music.url) return
+  if (!next || !url || url === playerStore.music.url) return false
   // 用完整对象接续，保证歌名/封面/歌词正确；pushTime 取当前时间，
   // 否则 loadedmetadata 的进度校准会按旧推送时间把进度跳到接近结尾
   playerStore.setMusic({ ...next, url, pushTime: Date.now() })
+  return true
 }
 
 // 音乐切换时：重新播放 + 唱片转动
