@@ -40,11 +40,27 @@ watch(
   { immediate: true },
 )
 
-// flush: 'post' 保证 DOM 已更新，无需再手动 nextTick
-watch(activeLine, () => {
-  const el = container.value?.querySelector('.lyrics-active')
-  el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-}, { flush: 'post' })
+// 只滚动歌词容器自身。
+// 不能用 scrollIntoView：它会把「所有可滚动祖先」都滚一遍，于是整个页面也被滚到
+// 让高亮行居中的位置——展开歌词时页面会莫名其妙跳走。
+// flush: 'post' 保证 DOM 已更新、位置测量准确。
+watch(
+  activeLine,
+  () => {
+    const box = container.value
+    if (!box) return
+    const active = box.querySelector<HTMLElement>('.lyrics-active')
+    if (!active) return
+    // 容器是 static 定位，不是 offsetParent，故用两者的相对位置算偏移
+    const delta =
+      active.getBoundingClientRect().top -
+      box.getBoundingClientRect().top -
+      (box.clientHeight - active.offsetHeight) / 2
+    if (Math.abs(delta) < 1) return
+    box.scrollTo({ top: box.scrollTop + delta, behavior: 'smooth' })
+  },
+  { flush: 'post' },
+)
 </script>
 
 <style scoped>
