@@ -61,7 +61,7 @@
           >
             <template #prepend>
               <v-badge :content="houseItem.population || '0'" color="info">
-                <v-avatar :color="houseItem.needPwd ? 'blue' : 'green'" size="32">
+                <v-avatar :color="houseItem.needPwd ? 'info' : 'success'" size="32">
                   <v-icon>{{ houseItem.needPwd ? 'mdi-lock' : 'mdi-lock-open-variant' }}</v-icon>
                 </v-avatar>
               </v-badge>

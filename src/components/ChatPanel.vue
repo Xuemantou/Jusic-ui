@@ -91,14 +91,14 @@
 
     <!-- 功能按钮 -->
     <v-card-actions class="px-3 pb-3 pt-0 flex-wrap">
-      <v-chip size="small" color="teal" variant="tonal" @click="$emit('openPictureSearch')">
+      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openPictureSearch')">
         搜索图片
       </v-chip>
-      <v-chip size="small" color="teal" variant="tonal" @click="musicSkipVote">投票切歌</v-chip>
-      <v-chip size="small" color="teal" variant="tonal" @click="$emit('openSearch')">搜索音乐</v-chip>
-      <v-chip size="small" color="teal" variant="tonal" @click="$emit('openSongList')">搜索歌单</v-chip>
-      <v-chip size="small" color="teal" variant="tonal" @click="$emit('openUserSearch')">搜索用户</v-chip>
-      <v-chip size="small" color="orange" variant="tonal" @click="$emit('openBili')">B站直播</v-chip>
+      <v-chip size="small" color="primary" variant="tonal" @click="musicSkipVote">投票切歌</v-chip>
+      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openSearch')">搜索音乐</v-chip>
+      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openSongList')">搜索歌单</v-chip>
+      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openUserSearch')">搜索用户</v-chip>
+      <v-chip size="small" color="tertiary" variant="tonal" @click="$emit('openBili')">B站直播</v-chip>
     </v-card-actions>
   </v-card>
 </template>
@@ -190,12 +190,12 @@ watch(
 }
 .chat-notice {
   text-align: center;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgb(var(--v-theme-on-surface-variant));
   font-size: 12px;
 }
 .chat-user {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 2px;
 }
 .chat-content {
@@ -203,7 +203,7 @@ watch(
   padding: 8px 12px;
   max-width: calc(100% - 5px);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--v-theme-surface-container-high));
   word-break: break-word;
 }
 .chat-img {

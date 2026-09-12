@@ -50,8 +50,8 @@
           color="info"
           class="ma-1"
         >
-          <v-chip color="teal" @click="enterHomeHouse(house.id, house.name, house.needPwd)">
-            <v-avatar :color="house.needPwd ? 'blue' : 'green'" size="32" start>
+          <v-chip color="primary" @click="enterHomeHouse(house.id, house.name, house.needPwd)">
+            <v-avatar :color="house.needPwd ? 'info' : 'success'" size="32" start>
               <v-icon>{{ house.needPwd ? 'mdi-lock' : 'mdi-lock-open-variant' }}</v-icon>
             </v-avatar>
             <v-tooltip activator="parent" location="top">{{ house.desc }}</v-tooltip>
@@ -127,13 +127,13 @@
                   <div class="text-h5 font-weight-regular mb-2 d-flex align-center">
                     <span class="text-truncate">{{ music?.name || '' }}</span>
                     <v-spacer />
-                    <v-btn size="small" variant="text" color="teal" prepend-icon="mdi-weather-sunny" @click="searchTop">
+                    <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-weather-sunny" @click="searchTop">
                       热歌榜
                     </v-btn>
-                    <v-btn size="small" variant="text" color="teal" prepend-icon="mdi-history" @click="openPickHistory = true">
+                    <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-history" @click="openPickHistory = true">
                       点歌历史
                     </v-btn>
-                    <v-btn size="small" variant="text" color="red" prepend-icon="mdi-heart" @click="openFavorite = true">
+                    <v-btn size="small" variant="text" color="error" prepend-icon="mdi-heart" @click="openFavorite = true">
                       我的收藏
                     </v-btn>
                   </div>
@@ -145,7 +145,7 @@
                   <div class="text-body-2 mb-1">
                     <span
                       class="cursor-pointer"
-                      :style="{ color: openLyrics ? 'orange' : '#009688' }"
+                      :style="{ color: openLyrics ? 'rgb(var(--v-theme-tertiary))' : 'rgb(var(--v-theme-primary))' }"
                       @click="openLyrics = !openLyrics"
                     >
                       {{ openLyrics ? '↑↑↑' : '↓↓↓' }} {{ lyric }}
@@ -156,7 +156,7 @@
                   <div class="text-caption text-right">{{ playerTime }}</div>
 
                   <div class="d-flex align-center">
-                    <v-icon color="teal" class="mr-2">mdi-volume-high</v-icon>
+                    <v-icon color="primary" class="mr-2">mdi-volume-high</v-icon>
                     <v-slider v-model="volume" color="primary" min="0" max="100" hide-details />
                   </div>
                 </v-col>
@@ -185,7 +185,7 @@
                       <v-btn
                         :icon="favoriteMap[row?.id] ? 'mdi-heart' : 'mdi-heart-outline'"
                         size="x-small"
-                        :color="favoriteMap[row?.id] ? 'red' : 'grey'"
+                        :color="favoriteMap[row?.id] ? 'error' : 'on-surface-variant'"
                         variant="text"
                         @click="favoriteMap[row?.id] ? removeCollect(row) : collectMusic(row)"
                       />
@@ -193,7 +193,7 @@
                         v-if="index !== 0 && socketStore.good"
                         icon="mdi-thumb-up"
                         size="x-small"
-                        color="teal"
+                        color="primary"
                         variant="text"
                         @click="goodMusic(row)"
                       />
@@ -216,7 +216,7 @@
             <!-- 右栏：聊天 -->
             <v-col cols="12" md="4">
               <div class="text-center mb-2">
-                <v-btn color="teal" variant="tonal" prepend-icon="mdi-account-balance" @click="openHouse = true">
+                <v-btn color="primary" variant="tonal" prepend-icon="mdi-account-balance" @click="openHouse = true">
                   听歌房
                 </v-btn>
               </div>
@@ -264,7 +264,7 @@
                 <v-list-item-title>{{ item.name }}</v-list-item-title>
                 <v-list-item-subtitle>{{ item.artist }}</v-list-item-subtitle>
                 <template #append>
-                  <v-btn icon size="small" variant="text" color="red" @click="removeCollect(item)">
+                  <v-btn icon size="small" variant="text" color="error" @click="removeCollect(item)">
                     <v-icon>mdi-heart-off</v-icon>
                   </v-btn>
                 </template>
@@ -788,7 +788,7 @@ onUnmounted(() => {
 .page-bg-mask {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: rgb(var(--v-theme-scrim));
 }
 
 /* 播放页动态背景：当前专辑封面放大 + 模糊 */
@@ -797,7 +797,7 @@ onUnmounted(() => {
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: #121212;
+  background: rgb(var(--v-theme-background));
 }
 .album-bg img {
   width: 100%;
@@ -815,8 +815,8 @@ onUnmounted(() => {
 }
 
 .album-avatar {
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  box-shadow: inset 0 0 20px 2px #000;
+  border: 2px solid rgba(var(--v-theme-on-surface), 0.5);
+  box-shadow: inset 0 0 20px 2px rgb(var(--v-theme-shadow));
   overflow: hidden;
 }
 

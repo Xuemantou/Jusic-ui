@@ -72,11 +72,11 @@ watch(
 }
 .lyrics-line {
   padding: 6px 16px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(var(--v-theme-on-surface-variant));
   transition: color 0.2s, transform 0.2s;
 }
 .lyrics-active {
-  color: #fff;
+  color: rgb(var(--v-theme-on-surface));
   font-weight: 600;
   transform: scale(1.05);
 }

@@ -49,13 +49,13 @@
                   v-if="showPickButton(row)"
                   icon="mdi-play"
                   size="x-small"
-                  color="teal"
+                  color="primary"
                   variant="text"
                   @click="pickMusic(row)"
                 />
                 <v-tooltip v-else text="当前音乐不能点播">
                   <template #activator="{ props }">
-                    <v-icon v-bind="props" size="20" color="grey">mdi-play</v-icon>
+                    <v-icon v-bind="props" size="20" color="on-surface-variant">mdi-play</v-icon>
                   </template>
                 </v-tooltip>
                 {{ row.name }}

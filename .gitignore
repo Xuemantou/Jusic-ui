@@ -30,3 +30,6 @@ vite.config.d.ts
 
 # 本地调试（无头浏览器 profile）
 .firefox-profile
+
+# 本地环境专用（缓存路径为本机绝对路径，不应提交）
+.npmrc

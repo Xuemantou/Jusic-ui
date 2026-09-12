@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(var(--v-theme-scrim), 0.6);
 }
 .picture-action {
   position: absolute;
