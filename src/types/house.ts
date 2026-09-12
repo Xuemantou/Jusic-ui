@@ -26,6 +26,8 @@ export interface HouseForm {
   needPwd: boolean
   enableStatus: boolean
   retainKey: string
+  /** 房间管理员密码：创建时设置，用于进入本房间的管理面板（/auth/admin 提权） */
+  adminPwd: string
 }
 
 /** 聊天消息（后端 Chat 默认 type='chat'，系统提示为本地构造的 'notice'） */
@@ -36,6 +38,5 @@ export interface ChatMessage {
   content?: string
   nickName?: string
   sessionId?: string
-  images?: string[]
   sendTime?: number
 }

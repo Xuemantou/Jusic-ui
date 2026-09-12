@@ -65,8 +65,14 @@ watch(
 
 <style scoped>
 .lyrics-container {
-  max-height: 250px;
+  /* 高度交给父窗格（MusicView 的 .np-lyrics 是 flex 容器）。
+     原来写死 max-height: 250px，在三窗格布局里宽屏下只占窗格的一小块，白留大片空白。 */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  /* 同 .pane__body：不显式写 overflow-x 的话，它会跟着 overflow-y 一起变成 auto，
+     长句歌词稍宽就多冒一条横向滚动条。这里只保留竖向这一根。 */
+  overflow-x: hidden;
   text-align: center;
   padding: 8px 0;
 }
@@ -74,6 +80,8 @@ watch(
   padding: 6px 16px;
   color: rgb(var(--v-theme-on-surface-variant));
   transition: color 0.2s, transform 0.2s;
+  /* 超长句（尤其没有空格的外文或连续符号）要能断行，否则会横向溢出 */
+  overflow-wrap: anywhere;
 }
 .lyrics-active {
   color: rgb(var(--v-theme-on-surface));

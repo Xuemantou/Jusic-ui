@@ -2,11 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Music, SongList, UserInfo } from '@/types/music'
 
-/** 搜索图片项 */
-export interface PictureItem {
-  url: string
-}
-
 /**
  * 搜索状态（对齐旧 Vuex 的 state.search / searchGd / searchUser）
  */
@@ -15,11 +10,6 @@ export const useSearchStore = defineStore('search', () => {
   const keyword = ref('')
   const data = ref<Music[]>([])
   const count = ref(0)
-
-  // 图片搜索（斗图）
-  const pictureKeyword = ref('')
-  const pictureData = ref<PictureItem[]>([])
-  const pictureCount = ref(0)
 
   // 歌单搜索
   const gdKeyword = ref('')
@@ -40,15 +30,6 @@ export const useSearchStore = defineStore('search', () => {
   }
   function setCount(value: number) {
     count.value = value
-  }
-  function setPictureKeyword(value: string) {
-    pictureKeyword.value = value
-  }
-  function setPictureData(value: PictureItem[]) {
-    pictureData.value = Array.isArray(value) ? value.filter((m) => m != null) : []
-  }
-  function setPictureCount(value: number) {
-    pictureCount.value = value
   }
   function setGdKeyword(value: string) {
     gdKeyword.value = value
@@ -73,9 +54,6 @@ export const useSearchStore = defineStore('search', () => {
     keyword,
     data,
     count,
-    pictureKeyword,
-    pictureData,
-    pictureCount,
     gdKeyword,
     gdData,
     gdCount,
@@ -85,9 +63,6 @@ export const useSearchStore = defineStore('search', () => {
     setKeyword,
     setData,
     setCount,
-    setPictureKeyword,
-    setPictureData,
-    setPictureCount,
     setGdKeyword,
     setGdData,
     setGdCount,

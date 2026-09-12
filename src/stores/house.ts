@@ -30,6 +30,7 @@ export const useHouseStore = defineStore('house', () => {
     needPwd: false,
     enableStatus: false,
     retainKey: '',
+    adminPwd: '',
   })
   /** 首页「创建房间」表单 */
   const homeHouse = ref<HouseForm>({
@@ -39,7 +40,21 @@ export const useHouseStore = defineStore('house', () => {
     needPwd: false,
     enableStatus: false,
     retainKey: '',
+    adminPwd: '',
   })
+  /** 当前房间的默认点歌列表歌曲数（管理面板显示；由 DEFAULT_PLAYLIST 消息更新） */
+  const defaultPlaylistSize = ref(0)
+  /** 当前房间的完整信息（管理面板回填表单；由 HOUSE_INFO 消息更新） */
+  const houseInfo = ref<House | null>(null)
+  /**
+   * 刚创建房间时记下的管理员密码。
+   *
+   * 只存在内存里（不持久化），用途是让创建者在本次会话内免密打开管理面板：
+   * 后端的「创建者自动成为 admin」判断是 `WebSocket sessionId == houseId`，
+   * 而 houseId 派生自 HTTP session —— 两者永不相等，所以创建者进房后其实也是 default，
+   * 不缓存的话每次开面板都得手输一遍密码。
+   */
+  const adminPwdCache = ref('')
 
   function setHouses(value: House[]) {
     houses.value = value
@@ -49,6 +64,15 @@ export const useHouseStore = defineStore('house', () => {
   }
   function setMusichouse(value: string) {
     musichouse.value = value
+  }
+  function setDefaultPlaylistSize(value: number) {
+    defaultPlaylistSize.value = Number.isFinite(value) ? value : 0
+  }
+  function setHouseInfo(value: House | null) {
+    houseInfo.value = value
+  }
+  function setAdminPwdCache(value: string) {
+    adminPwdCache.value = value
   }
 
   return {
@@ -64,8 +88,14 @@ export const useHouseStore = defineStore('house', () => {
     houseForward,
     house,
     homeHouse,
+    defaultPlaylistSize,
+    houseInfo,
+    adminPwdCache,
     setHouses,
     setHomeHouses,
     setMusichouse,
+    setDefaultPlaylistSize,
+    setHouseInfo,
+    setAdminPwdCache,
   }
 })

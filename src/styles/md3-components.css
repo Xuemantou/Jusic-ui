@@ -1,0 +1,280 @@
+/**
+ * MD3 组件形状与规格对齐
+ *
+ * Vuetify 的默认圆角仍停留在 MD2 的小尺寸（卡片 / 对话框 / 列表 / 芯片都是 4px），
+ * 而 MD3 的形状语言以更大的圆角为特征——这也是"看起来不现代"的主要来源之一：
+ *   卡片 12、对话框 28、芯片 8、按钮全圆。
+ * 这里统一对齐到 --v-shape-* 令牌（MD3 shape scale：4 / 8 / 12 / 16 / 28）。
+ *
+ * 不需要 !important：Vuetify 4 把组件样式全部置于 @layer 内
+ * （见 vuetify/lib/styles/main.css 开头的 @layer vuetify-core / -components / -overrides），
+ * 而未分层的样式在层叠中优先于任何 @layer。
+ *
+ * 本文件是「UI 方案」的公共契约：布局骨架（窗格 / 导航栏）依赖这里的类，
+ * 改规格先改这里，不要在各个组件里散落硬编码。
+ */
+
+/* ==========================================================================
+   1. 形状（Shape scale）
+   ========================================================================== */
+
+/* 卡片：MD3 medium 形状 */
+.v-card {
+  border-radius: var(--v-shape-md);
+}
+
+/* 对话框内的卡片：MD3 extra-large 形状 */
+.v-dialog .v-card {
+  border-radius: var(--v-shape-xl);
+}
+
+/* 芯片：MD3 small 形状 */
+.v-chip {
+  border-radius: var(--v-shape-sm);
+}
+
+/* 按钮：MD3 用全圆角（pill）。图标按钮本就是圆形，排除在外。
+   排除 .v-btn--icon 后仍需保留其 50%，故只作用于非图标按钮。 */
+.v-btn:not(.v-btn--icon):not(.v-btn--fab) {
+  border-radius: 9999px;
+}
+
+/* 分段按钮：MD3 里两端全圆、中间保持方形，与上面的按钮族一致 */
+.v-btn-toggle {
+  border-radius: 9999px;
+}
+.v-btn-toggle > .v-btn:first-child {
+  border-start-start-radius: 9999px;
+  border-end-start-radius: 9999px;
+}
+.v-btn-toggle > .v-btn:last-child {
+  border-start-end-radius: 9999px;
+  border-end-end-radius: 9999px;
+}
+
+/* 下拉 / 菜单面板：与卡片同级的容器 */
+.v-overlay__content > .v-list,
+.v-overlay__content > .v-sheet {
+  border-radius: var(--v-shape-md);
+}
+
+/* 列表在 MD3 中仍是列表：容器不额外加圆角，圆角只出现在可交互项的状态层上 */
+.v-list {
+  border-radius: var(--v-shape-md);
+}
+
+/* v-table 由卡片承载，自身不再需要圆角与背景，避免与卡片形成双重边界 */
+.v-table {
+  background: transparent;
+}
+
+/* ==========================================================================
+   2. 导航：顶部应用栏 + 底部导航栏（Navigation Bar）
+   ========================================================================== */
+
+/* MD3 small top app bar：高度 64、surface 色，不靠阴影分层，用一条 outline 划界。
+   首页与播放页共用，故在此统一定义。 */
+.app-bar {
+  border-bottom: 1px solid rgb(var(--v-theme-outline-variant));
+}
+.app-bar .v-app-bar-title {
+  min-width: 0;
+}
+
+/* MD3 navigation bar：容器 80 高、surface-container 色、无阴影。
+   默认的 v-bottom-navigation 是 MD2 规格（56 高 + 抬升阴影 + 主色文字），
+   这里逐条对齐到 MD3：选中语义由「指示器药丸」承载，而不是把整项染成主色。 */
+.v-bottom-navigation {
+  background: rgb(var(--v-theme-surface-container));
+  box-shadow: none !important;
+  border-top: 1px solid rgb(var(--v-theme-outline-variant));
+}
+.v-bottom-navigation .v-bottom-navigation__content > .v-btn {
+  border-radius: 0;
+  text-transform: none;
+}
+/* 传入的 color 会把选中项文字染成主色；MD3 的标签保持 on-surface，
+   选中语义交给指示器药丸，故统一压回默认前景色。
+   注意选中态类名是 Vuetify 4 的 `.v-btn--active`（没有 `--selected`）：
+   写错类名的后果是「药丸永远不出现」，而且不报错、只在视觉上少一层反馈。 */
+.v-bottom-navigation .v-btn {
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+.v-bottom-navigation .v-btn--active {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+/* 导航项内容：图标在上、标签在下 */
+.md3-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+/* MD3 指示器：64x32 药丸，选中时填 secondary-container；
+   图标放在药丸内，未选中时药丸透明。 */
+.md3-nav-indicator {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 32px;
+  border-radius: 16px;
+  transition: background-color 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+.v-btn--active .md3-nav-indicator {
+  background: rgb(var(--v-theme-secondary-container));
+}
+.v-btn--active .md3-nav-indicator .v-icon {
+  color: rgb(var(--v-theme-on-secondary-container));
+}
+/* 标签：MD3 label-medium（12 / 500） */
+.md3-nav-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  letter-spacing: 0.03125rem;
+}
+
+/* ==========================================================================
+   3. 列表（List）
+   ========================================================================== */
+
+/* MD3 列表项最小高度：单行 56、双行 72、三行 88（Vuetify 默认 48 / 64 / 88） */
+.md3-list .v-list-item--one-line {
+  min-height: 56px;
+}
+.md3-list .v-list-item--two-line {
+  min-height: 72px;
+}
+
+/* 列表项是 MD3 的"全宽"形态：不加外边距，靠分隔线或色彩分层区隔 */
+.md3-list .v-list-item {
+  border-radius: 0;
+}
+
+/* 正在播放的列表项：用 tonal 面（secondary-container）表达选中态，
+   这是 MD3 的选中语义，不必再画边框或角标。 */
+.md3-list .v-list-item--playing {
+  background: rgb(var(--v-theme-secondary-container));
+  color: rgb(var(--v-theme-on-secondary-container));
+}
+.md3-list .v-list-item--playing .v-list-item-subtitle {
+  color: rgb(var(--v-theme-on-secondary-container));
+  opacity: 0.8;
+}
+
+/* 列表项 trailing 的图标按钮：MD3 图标按钮可视尺寸是 40，
+   原实现用 x-small（24）明显小于规范，这里统一提到 40。 */
+.md3-list .v-list-item__append .v-btn--icon {
+  width: 40px;
+  height: 40px;
+}
+
+/* ==========================================================================
+   4. 滑块（Slider）
+   ========================================================================== */
+
+/* MD3 的滑块 handle 是 4x44 的竖条（圆角 2），不是圆形。 */
+.md3-slider .v-slider-thumb {
+  color: rgb(var(--v-theme-primary));
+  /* 必须锁死这个变量：Vuetify 用它算 handle 的位置偏移
+     （left: calc(position - thumb-size/2)），而它是通过**内联样式**设在元素上的，
+     普通 CSS 覆盖不了，只能 !important。
+     不改的话，它会按默认 20px 去偏移，而实际竖条只有 4px 宽 ——
+     圆心会整体偏左约 8px，看起来"根本不在音量条上"。 */
+  --v-slider-thumb-size: 4px !important;
+}
+.md3-slider .v-slider-thumb__surface {
+  width: 4px;
+  height: 44px;
+  border-radius: 2px;
+}
+/* 干掉 hover/按下时浮出来的状态层圆点。
+   它是 surface 的 ::before（width/height 100% + border-radius 50%），
+   套在 4x44 的竖条上会变成一个椭圆，和轨道对不齐，纯属视觉噪音。 */
+.md3-slider .v-slider-thumb__surface::before {
+  display: none;
+}
+/* 轨道：未激活段降透明度，与激活段同厚 */
+.md3-slider .v-slider-track__background {
+  opacity: 0.32;
+}
+
+/* ==========================================================================
+   5. 文本字段与搜索栏（Text field / Search bar）
+   ========================================================================== */
+
+/* MD3 outlined 文本字段圆角是 4（Vuetify 默认套用了 rounded-xl=28，过于夸张） */
+.v-field--variant-outlined {
+  border-radius: var(--v-shape-xs);
+}
+
+/* MD3 search bar：全圆角 28、高 56、surface-container-high 面，
+   无边框——由色彩分层而非描边界定。 */
+.md3-search-bar .v-field {
+  border-radius: 9999px;
+  background: rgb(var(--v-theme-surface-container-high));
+}
+.md3-search-bar .v-field__outline {
+  display: none;
+}
+.md3-search-bar .v-field__input {
+  min-height: 56px;
+  padding-inline-start: 8px;
+}
+
+/* ==========================================================================
+   6. 其他组件的 MD3 对齐
+   ========================================================================== */
+
+/* FAB：MD3 标准 56x56、圆角 16 */
+.v-fab:not(.v-fab--extended) {
+  border-radius: var(--v-shape-lg);
+}
+
+/* 分段按钮（Segmented button）：MD3 高 40 */
+.v-btn-toggle--density-default > .v-btn {
+  min-height: 40px;
+}
+
+/* 消息条（Snackbar）：MD3 圆角 4 */
+.v-snackbar__wrapper {
+  border-radius: var(--v-shape-xs);
+}
+
+/* 分隔线：MD3 用 1dp outline-variant */
+.v-divider {
+  border-color: rgb(var(--v-theme-outline-variant));
+  opacity: 1;
+}
+
+/* ==========================================================================
+   7. 第三方品牌图标（把彩色 logo 变成与 mdi 图标同款的单色图标）
+   ========================================================================== */
+
+/* 做法：把 logo 的"形状"做成蒙版 PNG，再用 currentColor 着色。
+   这样既是官方 logo 的形状，又和 mdi 图标一样是单色、跟随明暗主题。
+
+   两个必须注意的点（都实际踩过）：
+   1) 蒙版必须是「图形不透明 + 背景透明」的**带 alpha 通道**的 PNG。
+      用 `convert x.png -alpha extract` 得到的是**灰度图、没有 alpha 通道**，
+      而 mask 对位图默认按 alpha 取值 —— 那张图会被当成整块全透明，图标直接消失。
+   2) 源图分辨率要够。B 站官方 favicon 只有 32x32，在 Retina 屏上按 24 CSS px 显示
+      需要 48 物理像素，等于放大 1.5 倍，边缘必然发虚。这里已用 Lanczos 放大到
+      128x128 并带出抗锯齿过渡（alpha 有 249 级灰度，原始二值图只有 2 级）。
+
+   用 currentColor 而不是抠具体颜色变量：容器是 v-icon 时它的 color 已经是主题色，
+   直接继承最稳，也不会因透明度取错而比旁边的图标偏淡。 */
+.md3-icon-bilibili {
+  background-color: currentColor;
+  -webkit-mask-image: url('../assets/images/bilibili-mask.png');
+  -webkit-mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: url('../assets/images/bilibili-mask.png');
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+}
+

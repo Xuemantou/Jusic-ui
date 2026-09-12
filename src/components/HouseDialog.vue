@@ -4,6 +4,9 @@
       <v-card-title class="d-flex align-center">
         <span>听歌房</span>
         <v-spacer />
+        <v-btn size="small" variant="text" prepend-icon="mdi-cog-outline" @click="$emit('open-admin')">
+          房间管理
+        </v-btn>
         <v-btn size="small" variant="text" @click="innerHouseHide = !innerHouseHide">
           {{ innerHouseHide ? '显示空房' : '隐藏空房' }}
         </v-btn>
@@ -14,18 +17,28 @@
 
       <v-card-text>
         <!-- 创建房间表单 -->
-        <v-row dense align="center">
-          <v-col cols="12" sm="4">
+        <v-row dense>
+          <v-col cols="12" sm="6">
             <v-text-field v-model="house.name" placeholder="房间名称" variant="outlined" density="compact" hide-details />
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col cols="12" sm="6">
             <v-text-field v-model="house.desc" placeholder="房间描述" variant="outlined" density="compact" hide-details />
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col v-if="house.needPwd" cols="12" sm="6">
             <v-text-field
-              v-if="house.needPwd"
               v-model="house.password"
               placeholder="房间密码"
+              variant="outlined"
+              density="compact"
+              hide-details
+            />
+          </v-col>
+          <!-- 管理员密码：进入本房间管理面板用，创建时必填 -->
+          <v-col cols="12" sm="6">
+            <v-text-field
+              v-model="house.adminPwd"
+              placeholder="管理员密码（至少4位）"
+              type="password"
               variant="outlined"
               density="compact"
               hide-details
@@ -110,6 +123,7 @@ watch(
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'open-admin': []
 }>()
 
 const houseStore = useHouseStore()
@@ -145,6 +159,7 @@ function createHouse() {
     password: house.value.password,
     enableStatus: house.value.enableStatus,
     retainKey: house.value.retainKey,
+    adminPwd: house.value.adminPwd,
   })
 }
 

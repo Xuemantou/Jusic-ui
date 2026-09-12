@@ -1,6 +1,7 @@
 <template>
-  <v-card class="chat-panel">
-    <v-card-title class="d-flex align-center py-2">
+  <!-- 聊天窗格：MD3 里窗格本身就是"面"，不再套一层卡片，避免面中面 -->
+  <div class="chat-panel">
+    <header class="chat-head">
       <span class="text-h6">实时聊天</span>
       <v-spacer />
       <v-btn variant="text" size="small" title="查看房间用户" @click="houseUser">
@@ -18,10 +19,10 @@
         <v-icon size="small" class="mr-1">mdi-refresh</v-icon>
         重新连接
       </v-btn>
-      <v-btn icon size="small" variant="text" title="清空聊天" @click="clearChat">
+      <v-btn icon variant="text" title="清空聊天" @click="clearChat">
         <v-icon size="small">mdi-broom</v-icon>
       </v-btn>
-    </v-card-title>
+    </header>
 
     <!-- 聊天消息 -->
     <div ref="chatContainer" class="chat-container">
@@ -29,40 +30,31 @@
            若 key 里含 index 会导致每次新消息重建整串 DOM 节点 -->
       <div v-for="item in chatData" :key="item.id" class="chat-item">
         <div v-if="item.type === 'notice'" class="chat-notice">{{ item.content }}</div>
-        <div v-else>
+        <div v-else class="chat-msg">
           <div class="chat-user">
             {{ isAdminView ? item.nickName + `[${item.sessionId}]` : item.nickName }}
           </div>
-          <div class="chat-content">
-            <span>{{ item.content }}</span>
-            <img
-              v-for="(img, i) in item.images || []"
-              :key="i"
-              :src="img"
-              alt=""
-              class="chat-img"
-            />
-          </div>
+          <div class="chat-content">{{ item.content }}</div>
         </div>
       </div>
     </div>
 
     <!-- 输入区 -->
-    <div class="chat-input pa-3">
-      <div class="d-flex align-center">
+    <div class="chat-input">
+      <div class="chat-input__row">
         <v-text-field
           v-model="chatMessage"
-          placeholder="Message..."
+          placeholder="说点什么…"
           variant="outlined"
           density="compact"
           hide-details
-          class="mr-1"
+          class="chat-input__field"
           @keydown.enter="onEnter"
         />
         <v-menu :close-on-content-click="false" location="top">
           <template #activator="{ props }">
             <v-btn icon variant="text" v-bind="props" title="表情">
-              <span style="font-size: 20px">😃</span>
+              <span class="chat-emoji-trigger">😃</span>
             </v-btn>
           </template>
           <v-card class="pa-2 emoji-card">
@@ -75,32 +67,54 @@
                 variant="text"
                 @click="insertEmoji(e)"
               >
-                <span style="font-size: 18px">{{ e }}</span>
+                <span class="chat-emoji-item">{{ e }}</span>
               </v-btn>
             </div>
           </v-card>
         </v-menu>
+        <!-- MD3：发送是 filled 图标按钮（配合 Enter 键）。
+             原来整行的大按钮会吃掉本就不多的消息区高度 -->
+        <v-btn icon color="primary" variant="flat" title="发送" @click="doSend">
+          <v-icon>mdi-send</v-icon>
+        </v-btn>
       </div>
-      <v-btn-toggle v-model="sourceChat" mandatory class="mt-2" color="primary" variant="outlined" divided>
-        <v-btn value="wy" size="x-small">网易</v-btn>
-        <v-btn value="qq" size="x-small">QQ</v-btn>
-        <v-btn value="mg" size="x-small">咪咕</v-btn>
-      </v-btn-toggle>
-      <v-btn color="primary" block class="mt-2" @click="doSend">发送消息</v-btn>
-    </div>
 
-    <!-- 功能按钮 -->
-    <v-card-actions class="px-3 pb-3 pt-0 flex-wrap">
-      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openPictureSearch')">
-        搜索图片
-      </v-chip>
-      <v-chip size="small" color="primary" variant="tonal" @click="musicSkipVote">投票切歌</v-chip>
-      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openSearch')">搜索音乐</v-chip>
-      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openSongList')">搜索歌单</v-chip>
-      <v-chip size="small" color="primary" variant="tonal" @click="$emit('openUserSearch')">搜索用户</v-chip>
-      <v-chip size="small" color="tertiary" variant="tonal" @click="$emit('openBili')">B站直播</v-chip>
-    </v-card-actions>
-  </v-card>
+      <!-- 工具行：图标按钮而非会自动换行的 chips，窄窗格里也不会堆成三行 -->
+      <div class="chat-tools">
+        <v-btn-toggle
+          v-model="sourceChat"
+          mandatory
+          density="comfortable"
+          variant="outlined"
+          divided
+          color="primary"
+        >
+          <v-btn value="wy" size="small">网易</v-btn>
+          <v-btn value="qq" size="small">QQ</v-btn>
+          <v-btn value="mg" size="small">咪咕</v-btn>
+        </v-btn-toggle>
+        <v-spacer />
+        <v-btn icon size="small" variant="text" title="投票切歌" @click="musicSkipVote">
+          <v-icon>mdi-skip-next</v-icon>
+        </v-btn>
+        <v-btn icon size="small" variant="text" title="搜索音乐" @click="$emit('openSearch')">
+          <v-icon>mdi-music-note-plus</v-icon>
+        </v-btn>
+        <v-btn icon size="small" variant="text" title="搜索歌单" @click="$emit('openSongList')">
+          <v-icon>mdi-playlist-music</v-icon>
+        </v-btn>
+        <v-btn icon size="small" variant="text" title="搜索用户" @click="$emit('openUserSearch')">
+          <v-icon>mdi-account-search</v-icon>
+        </v-btn>
+        <v-btn icon size="small" variant="text" title="B站直播" @click="$emit('openBili')">
+          <!-- 官方 logo 的单色蒙版（.md3-icon-bilibili 见 md3-components.css），
+               与同排其它 mdi 图标同色同尺寸；原来这里是 mdi-television-classic。
+               刻意不带 color —— 那排图标本来就该是统一的前景色。 -->
+          <v-icon class="md3-icon-bilibili" />
+        </v-btn>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -110,7 +124,6 @@ import { useSocketStore } from '@/stores/socket'
 import { useSocket } from '@/composables/useSocket'
 
 defineEmits<{
-  openPictureSearch: []
   openSearch: []
   openSongList: []
   openUserSearch: []
@@ -121,7 +134,11 @@ const chatStore = useChatStore()
 const socketStore = useSocketStore()
 const { sendHandler, musicSkipVote, send, reconnect } = useSocket()
 
-const sourceChat = ref('wy')
+/** 音源偏好存到 store 并持久化：原先这里是组件内 ref，刷新就丢 */
+const sourceChat = computed({
+  get: () => socketStore.chatSource,
+  set: (v: string) => socketStore.setChatSource(v),
+})
 const chatContainer = ref<HTMLElement | null>(null)
 
 /** 内置常用表情（避免引入额外的 Vue2-only 表情库） */
@@ -179,41 +196,99 @@ watch(
 </script>
 
 <style scoped>
+/* 高度由父级窗格决定，这里只保证内部滚动区能正确收缩 */
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 头部：与队列窗格的 pane__head 保持同一套规格（MD3 的窗格标题行） */
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 12px 20px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline-variant));
+}
+
 .chat-container {
-  min-height: 300px;
-  max-height: 420px;
+  flex: 1 1 auto;
+  /* 必须能收缩，否则窄屏窗格里会把输入区挤出可视范围 */
+  min-height: 0;
   overflow-y: auto;
-  padding: 8px 12px;
+  padding: 12px 16px;
+  /* 滚动到底部时的呼吸空间，最后一条不会贴着输入区 */
+  scroll-padding-bottom: 8px;
 }
+
 .chat-item {
-  padding: 6px 0;
+  padding: 4px 0;
 }
+
 .chat-notice {
+  margin: 6px 0;
+  padding: 6px 12px;
+  border-radius: var(--v-shape-sm);
   text-align: center;
   font-size: var(--v-type-body-small-size);
   line-height: var(--v-type-body-small-height);
   color: rgb(var(--v-theme-on-surface-variant));
+  background: rgb(var(--v-theme-surface-container));
 }
+
+/* 发言人：MD3 label-medium，用主色与正文区分 */
 .chat-user {
-  font-size: var(--v-type-body-small-size);
-  line-height: var(--v-type-body-small-height);
-  color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 2px;
+  font-size: var(--v-type-label-medium-size, 0.75rem);
+  font-weight: 500;
+  line-height: var(--v-type-label-medium-height, 1rem);
+  color: rgb(var(--v-theme-primary));
 }
+.chat-msg + .chat-msg .chat-user {
+  margin-top: 4px;
+}
+
 .chat-content {
   display: inline-block;
+  max-width: 100%;
   padding: 8px 12px;
-  max-width: calc(100% - 5px);
-  border-radius: var(--v-shape-sm);
+  border-radius: var(--v-shape-md);
   background: rgb(var(--v-theme-surface-container-high));
+  font-size: var(--v-type-body-medium-size);
+  line-height: var(--v-type-body-medium-height);
   word-break: break-word;
 }
-.chat-img {
-  width: 100%;
-  display: block;
-  margin-top: 4px;
-  border-radius: var(--v-shape-xs);
+
+/* 输入区：与消息区之间用一条 outline 划界（MD3 用分隔而非阴影） */
+.chat-input {
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgb(var(--v-theme-outline-variant));
 }
+.chat-input__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-input__field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.chat-emoji-trigger {
+  font-size: 20px;
+}
+.chat-emoji-item {
+  font-size: 18px;
+}
+
+.chat-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
 .emoji-card {
   max-width: 320px;
   max-height: 280px;

@@ -468,17 +468,7 @@ export function useSocket() {
         break
       }
       case MessageType.CHAT: {
-        const data = { ...msg.data }
-        const imgList: string[] = []
-        const matchUrlList = data.content?.match(/\[picture\].*?:\/\/[^\s]*/gi) ?? null
-        if (matchUrlList !== null) {
-          for (const url of matchUrlList) {
-            imgList.push(url.replace('picture:', ''))
-            data.content = data.content.replace(url, '')
-          }
-        }
-        data.images = imgList
-        chatStore.pushData(data)
+        chatStore.pushData({ ...msg.data })
         break
       }
       case MessageType.GOODMODEL: {
@@ -549,9 +539,34 @@ export function useSocket() {
         houseStore.setHouses(sortByPopulation(msg.data ?? []))
         break
       }
-      case MessageType.SEARCH_PICTURE: {
-        searchStore.setPictureCount(msg.data?.totalSize ?? 0)
-        searchStore.setPictureData(msg.data?.data ?? [])
+      case MessageType.EDIT_HOUSE: {
+        // 房间信息被（自己或别人）改动后广播给全房间：app bar 上显示的就是房间名，要跟着更新
+        const edited = msg.data as { name?: string } | null
+        if (Number(msg.code) === SUCCESS_CODE) {
+          if (edited?.name) houseStore.setMusichouse(edited.name)
+          toast.success(msg.message)
+        } else {
+          toast.error(msg.message)
+        }
+        break
+      }
+      case MessageType.HOUSE_DESTROYED: {
+        toast.info(msg.message)
+        houseStore.setHouseInfo(null)
+        // 房间没了，所有人都得退回首页：复用「倒计时退出」注册的回首页钩子
+        onCloseHook?.()
+        break
+      }
+      case MessageType.HOUSE_INFO: {
+        if (Number(msg.code) === SUCCESS_CODE) {
+          houseStore.setHouseInfo((msg.data as never) ?? null)
+        } else {
+          toast.error(msg.message)
+        }
+        break
+      }
+      case MessageType.DEFAULT_PLAYLIST: {
+        houseStore.setDefaultPlaylistSize(Number(msg.data ?? 0))
         break
       }
       case MessageType.ENTER_HOUSE_START:
@@ -578,6 +593,8 @@ export function useSocket() {
           houseStore.houseId = msg.data
           houseStore.housePwd = houseStore.house.password
           houseStore.connectType = ''
+          // 记下这次创建用的管理员密码：本次会话内开管理面板就不必再手输
+          houseStore.setAdminPwdCache(houseStore.house.adminPwd)
           const userName = window.localStorage.getItem('USER_NAME')
           if (userName) settingName(userName)
         } else {

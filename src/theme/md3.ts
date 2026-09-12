@@ -58,6 +58,26 @@ const LEGACY_ROLE_FALLBACK: Record<string, string> = {
 }
 
 /**
+ * Vuetify 的 `.bg-<key>` 工具类会一并设置 `color: rgb(var(--v-theme-on-<key>))`，
+ * 所以任何可能被当作背景的角色都需要配对的 on-*。
+ * MD3 规范中 surface-container 系的前景统一用 on-surface，这里补上别名，
+ * 否则用 `color="surface-container"` 的地方会去取不存在的变量。
+ */
+const CONTAINER_FOREGROUND_ALIASES: Record<string, string> = {
+  'on-surface-container-lowest': 'on-surface',
+  'on-surface-container-low': 'on-surface',
+  'on-surface-container': 'on-surface',
+  'on-surface-container-high': 'on-surface',
+  'on-surface-container-highest': 'on-surface',
+  'on-surface-dim': 'on-surface',
+  'on-surface-tint': 'on-surface',
+  'on-outline': 'on-surface',
+  'on-scrim': 'on-surface',
+  'on-shadow': 'on-surface',
+  'on-inverse-surface': 'inverse-on-surface',
+}
+
+/**
  * Vuetify 默认主题里硬编码的 MD2 变体键。theme 是深度合并的，删不掉这些 key，
  * 只能覆盖，否则会残留 #1F5592 之类的旧蓝色。MD3 没有「变体」概念，直接指向对应角色。
  */
@@ -136,6 +156,9 @@ export function md3Theme(
 
   for (const [legacy, target] of Object.entries(LEGACY_ROLE_FALLBACK)) {
     colors[legacy] = colors[target]
+  }
+  for (const [alias, target] of Object.entries(CONTAINER_FOREGROUND_ALIASES)) {
+    colors[alias] = colors[target]
   }
   for (const [legacy, target] of Object.entries(LEGACY_VARIANT_KEYS)) {
     colors[legacy] = colors[target]

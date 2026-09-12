@@ -13,6 +13,11 @@ export const useSocketStore = defineStore('socket', () => {
   const online = ref(0)
   const isConnected = ref(false)
   const userName = ref<string | null>(localStorage.getItem('USER_NAME'))
+  /**
+   * 聊天默认音源（wy / qq / mg）。
+   * 原来它是 ChatPanel 内部的 ref，刷新即丢，每次进房都要重新选一遍。
+   */
+  const chatSource = ref<string>(localStorage.getItem('JUSIC_CHAT_SOURCE') || 'wy')
   const isRoot = ref(false)
   const isAdmin = ref(false)
   const good = ref(false)
@@ -27,6 +32,10 @@ export const useSocketStore = defineStore('socket', () => {
   function setUserName(value: string) {
     userName.value = value
     window.localStorage.setItem('USER_NAME', value)
+  }
+  function setChatSource(value: string) {
+    chatSource.value = value
+    window.localStorage.setItem('JUSIC_CHAT_SOURCE', value)
   }
   function setRoot(value: boolean) {
     isRoot.value = value
@@ -53,6 +62,7 @@ export const useSocketStore = defineStore('socket', () => {
     online,
     isConnected,
     userName,
+    chatSource,
     isRoot,
     isAdmin,
     good,
@@ -60,6 +70,7 @@ export const useSocketStore = defineStore('socket', () => {
     setOnline,
     setIsConnected,
     setUserName,
+    setChatSource,
     setRoot,
     setAdmin,
     setGood,
