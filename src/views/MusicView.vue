@@ -628,12 +628,15 @@ function onAudioEnded() {
   endedFallbackTimer = setTimeout(
     () => {
       endedFallbackTimer = null
-      // ① 队列里有下一首 → 本地接续
-      if (playNextFromQueue()) return
-      // ② 队列为空：下一首要由后端挑，只能请它切
+      // ① 先本地接续，避免出现静默空档（队列为空时接续不了，交给 ②）
+      const resumed = playNextFromQueue()
+      // ② 试听场景必须同时请后端切歌。
+      //    本地接续只是前端行为：服务端仍认为在播上一首，不会执行 pickToPlaying，
+      //    因此点歌列表不会前移（那首歌会一直挂在队列里），后端也要等完整时长才推下一首。
+      //    发一次投票切歌能让服务端把状态与列表都推进到正确位置。
       if (clip) {
         send('/music/skip/vote')
-        toast.info('试听片段已播完，已请求切歌')
+        if (!resumed) toast.info('试听片段已播完，已请求切歌')
       }
     },
     clip ? 300 : 3000,
