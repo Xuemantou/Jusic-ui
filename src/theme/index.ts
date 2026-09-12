@@ -39,9 +39,21 @@ export function syncVuetifyTheme() {
       const lightTheme = md3Theme(seed, false)
 
       theme.themes.value.dark.colors = darkTheme.colors
-      theme.themes.value.dark.variables = darkTheme.variables
       theme.themes.value.light.colors = lightTheme.colors
-      theme.themes.value.light.variables = lightTheme.variables
+
+      // variables 必须**合并**而不是整体替换。
+      //
+      // Vuetify 的 genOnColors 会为每个没有显式 on-* 的颜色角色自动补齐，
+      // 取值来自 variables 里的 theme-on-dark / theme-on-light：
+      //   onColors['on-x'] = hasLightForeground(...) ? variables['theme-on-dark'] : variables['theme-on-light']
+      // 一旦整个 variables 被替换掉，这两个键就不存在了，自动补齐出来的 on-*
+      // 会变成 undefined 混进 colors，随后 genCssVariables 在 parseColor 上抛
+      // "Invalid color: undefined"，整个应用在 mount 阶段直接渲染失败（白屏）。
+      //
+      // colors 则可以整体替换：md3Colors 已包含全部 62 个 MD3 角色，
+      // 也覆盖了 Vuetify 默认主题的全部 14 个键（见 scripts/verify-theme.ts 的断言）。
+      theme.themes.value.dark.variables = { ...theme.themes.value.dark.variables, ...darkTheme.variables }
+      theme.themes.value.light.variables = { ...theme.themes.value.light.variables, ...lightTheme.variables }
 
       // 用 change() 而不是 theme.global.name.value = ...：
       // 后者在 Vuetify 4 已弃用，会打印 [Vuetify UPGRADE] 警告。

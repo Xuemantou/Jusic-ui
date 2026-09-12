@@ -42,7 +42,13 @@ ws.addEventListener('message', ev => {
     else resolve(msg.result)
   } else if (msg.method === 'log.entryAdded') {
     const p = msg.params
-    logs.push(`[${p.level || p.type}] ${p.text || ''}`)
+    // console 类日志的堆栈在 stackTrace 里，text 本身不含堆栈信息——
+    // 排查 "Invalid color: undefined" 这类框架内部报错时必须靠它定位来源
+    const frames = (p.stackTrace?.callFrames || [])
+      .slice(0, 16)
+      .map(f => `${f.functionName || '?'}@${(f.url || '').split('/').slice(-1)[0]}:${f.lineNumber}`)
+      .join(' <- ')
+    logs.push(`[${p.level || p.type}] ${p.text || ''}${frames ? `\n      ${frames}` : ''}`)
   }
 })
 
@@ -120,13 +126,27 @@ const READ_CONTRAST = `JSON.stringify((() => {
   const app = document.querySelector('.v-application')
   const btn = document.querySelector('.v-btn')
   const card = document.querySelector('.v-card')
+  // text/outlined 变体的按钮背景是透明的，直接拿 rgba(0,0,0,0) 算对比度没有意义，
+  // 需要向上回退到实际可见的祖先背景
+  const effectiveBg = (el) => {
+    let node = el
+    while (node) {
+      const bg = getComputedStyle(node).backgroundColor
+      const m = bg && bg.match(/rgba?\\(([^)]+)\\)/)
+      const parts = m ? m[1].split(',').map(s => parseFloat(s)) : []
+      const alpha = parts.length === 4 ? parts[3] : 1
+      if (parts.length >= 3 && alpha > 0) return bg
+      node = node.parentElement
+    }
+    return getComputedStyle(document.body).backgroundColor
+  }
   return {
     appColor: app ? getComputedStyle(app).color : null,
     appBg: app ? getComputedStyle(app).backgroundColor : null,
     appContrast: app ? ct(getComputedStyle(app).color, getComputedStyle(app).backgroundColor) : null,
     btnText: btn ? getComputedStyle(btn).color : null,
-    btnBg: btn ? getComputedStyle(btn).backgroundColor : null,
-    btnContrast: btn ? ct(getComputedStyle(btn).color, getComputedStyle(btn).backgroundColor) : null,
+    btnBg: btn ? effectiveBg(btn) : null,
+    btnContrast: btn ? ct(getComputedStyle(btn).color, effectiveBg(btn)) : null,
     cardBg: card ? getComputedStyle(card).backgroundColor : null,
   }
 })())`
@@ -140,7 +160,28 @@ ws.addEventListener('open', async () => {
     await send('session.subscribe', { events: ['log.entryAdded'] })
 
     console.log(`--- 导航到 ${URL_UNDER_TEST} ---`)
-    await send('browsingContext.navigate', { context: contextId, url: URL_UNDER_TEST, wait: 'complete' })
+    // 加时间戳绕开浏览器缓存：否则重复验证时会一直跑上一次构建的产物，
+    // 堆栈里的文件名不会变，看起来像"改动没生效"
+    const bust = `${URL_UNDER_TEST}${URL_UNDER_TEST.includes('?') ? '&' : '?'}t=${Date.now()}`
+    await send('browsingContext.navigate', { context: contextId, url: bust, wait: 'complete' })
+    await wait(1500)
+
+    // 清掉上一次验证留下的主题状态，保证每次都是从「深色 + 品牌配色」起步。
+    // 否则上次跑完存的 light/background 会让"点击浅色"这一步无事发生，
+    // 看起来像热更新失效。
+    const cleared = await evaluate(contextId, `(() => {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('JUSIC_'))
+      keys.forEach(k => localStorage.removeItem(k))
+      return keys.join(',') || '(无)'
+    })()`)
+    console.log('已清除的主题状态:', cleared)
+    // 再导航一次（新时间戳）让应用以干净状态重新初始化。
+    // 不用 browsingContext.reload：Firefox 当前 BiDi 实现不支持该命令。
+    await send('browsingContext.navigate', {
+      context: contextId,
+      url: `${URL_UNDER_TEST}${URL_UNDER_TEST.includes('?') ? '&' : '?'}t=${Date.now()}`,
+      wait: 'complete',
+    })
     await wait(4000)
 
     // ---------- ① 初始状态（默认深色）----------
@@ -278,6 +319,13 @@ ws.addEventListener('open', async () => {
   } catch (e) {
     console.error('执行失败:', e.message)
     failed++
+  }
+
+  // BiDi 的 session 是一次性的：不释放的话，下一次连接会直接报 "session not created"
+  try {
+    await send('session.end', {})
+  } catch {
+    /* 忽略 */
   }
 
   console.log()

@@ -20,10 +20,13 @@
 
     <!-- 未播放：首页（房间列表 + 创建） -->
     <div v-if="!isPlay" class="home-page">
-      <div class="d-flex justify-space-between pa-4">
+      <div class="d-flex align-center pa-4">
         <v-btn color="info" variant="text" prepend-icon="mdi-heart" @click="openLink('https://tx.alang.run/sponsor')">
           赞赏
         </v-btn>
+        <v-spacer />
+        <!-- 首页不渲染 Navigation（那是播放页的 app-bar），故外观入口需单独放一份 -->
+        <ThemeMenu />
         <v-btn color="info" variant="text" prepend-icon="mdi-android" @click="openLink('https://tx.alang.run/release')">
           APP
         </v-btn>
@@ -327,6 +330,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import Navigation from '@/components/Navigation.vue'
+import ThemeMenu from '@/components/ThemeMenu.vue'
 import Lyrics from '@/components/Lyrics.vue'
 import ChatPanel from '@/components/ChatPanel.vue'
 import SearchDialog from '@/components/SearchDialog.vue'

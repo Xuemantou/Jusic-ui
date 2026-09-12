@@ -144,6 +144,9 @@ cd .. && mvn clean package -DskipTests
 | `class="text-h5"` 毫无效果 | Vuetify 4 **移除了全部排版工具类**——`.text-h1` ~ `.text-caption`、`.text-body-*` 在 `vuetify/lib/styles/main.css` 里 grep 计数为 0。本项目沿用这些类名，导致它们此前静默失效（文字尺寸只受继承影响）。需按 MD3 type scale 自行补齐（`src/styles/typography.css`） |
 | 自定义 `on-*` 颜色类名不对 | Vuetify 为普通角色生成 `.text-<key>`，但对 `on-` 前缀**只生成 `.on-<key>`**（`theme.js:250` 走的是另一个分支），所以应写 `class="on-surface-variant"` 而非 `text-on-surface-variant` |
 | 定义了令牌却没人用 | `npm run verify:theme` 会检查 `--v-type-*` 是否都被引用。MD3 共 15 个排版类别而 Vuetify 类名只覆盖 13 个，缺的 `display-medium` / `label-medium` 需单独命名，否则令牌变死代码 |
+| 白屏 + `Invalid color: undefined` | 运行时改主题若这样写：`theme.themes.value.dark.variables = 新对象`，会把 Vuetify 默认 variables **整体替换**掉，丢失其中的 `theme-on-dark` / `theme-on-light`。而 `genOnColors` 正是靠这两个变量给自动补齐的 `on-*` 角色取值，取不到就写入 `undefined` 混进 colors，随后 `genCssVariables` 在 `parseColor` 上抛错，应用在 mount 阶段直接白屏。**必须合并**：`{ ...现有, ...新的 }`。注意离线断言测不出来——它不经过运行时切换那条路径 |
+| `file://` 下重复验证结果不变 | 浏览器会缓存 bundle，堆栈里的文件名不更新，看起来像"改动没生效"。给导航 URL 加时间戳；`browsingContext.reload` 在当前 Firefox 的 BiDi 实现里不被支持，用再次 `navigate` 代替 |
+| 浏览器验证连跑两次报 `session not created` | WebDriver BiDi 的 session 是一次性的，脚本结束前必须 `session.end`，否则下一次连接会被拒 |
 
 ## 目录结构
 
@@ -160,3 +163,34 @@ src/
 
 `scripts/render-verify.mjs` 可在无头 Firefox（WebDriver BiDi）下捕获页面运行时错误与渲染结果。
 `scripts/verify-theme.ts` 校验 MD3 配色（`npm run verify:theme`）。
+
+## 主题的验证方式
+
+两条互补的验证路径，都能在无 dev server 的情况下跑：
+
+**① 离线断言**（`npm run verify:theme`）——覆盖配色生成与设计令牌：
+MD3 角色齐全性、明暗对比度（含 24 个色相 × 明暗共 48 套配色的回归）、
+非法 seed 回退、Vuetify 默认主题键覆盖、五类令牌、死代码检查，
+以及在 Node 内直接驱动 Vuetify 响应式 theme 以证明"改 colors 会重算 CSS 变量"。
+
+**② 浏览器端到端**（`scripts/verify-theme-runtime.mjs`）——覆盖离线断言够不到的部分：
+CSS 变量是否真的写进 DOM、排版类是否真的生效（`getComputedStyle` 探针）、
+点击切换是否热更新、真实渲染出的前景/背景对比度。
+
+后者不需要 dev server，做法是用相对路径构建一份产物再由 `file://` 打开：
+
+```bash
+# ① 构建（--base=./ 使资源引用变成相对路径；不影响 dist/ 与 vite 配置）
+npx vite build --base=./ --outDir=dist-verify --emptyOutDir
+
+# ② 启动无头 Firefox（需放宽 file:// 同源策略以便加载 ES module）
+mkdir -p ../.ffverify-profile
+printf 'user_pref("security.fileuri.strict_origin_policy", false);\n' > ../.ffverify-profile/user.js
+firefox --headless --no-remote --remote-debugging-port 9222 --profile "$PWD/../.ffverify-profile" about:blank &
+
+# ③ 跑验证
+THEME_VERIFY_URL="file://$PWD/dist-verify/index.html" node scripts/verify-theme-runtime.mjs
+```
+
+脚本每次运行前会清空 `JUSIC_*` 的 localStorage，保证从「深色 + 品牌配色」起步——
+否则上一次跑完残留的 light/background 会让"点击浅色"无事发生，看起来像热更新失效。
