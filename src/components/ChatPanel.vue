@@ -202,7 +202,7 @@ watch(
   display: inline-block;
   padding: 8px 12px;
   max-width: calc(100% - 5px);
-  border-radius: 8px;
+  border-radius: var(--v-shape-sm);
   background: rgb(var(--v-theme-surface-container-high));
   word-break: break-word;
 }
@@ -210,7 +210,7 @@ watch(
   width: 100%;
   display: block;
   margin-top: 4px;
-  border-radius: 4px;
+  border-radius: var(--v-shape-xs);
 }
 .emoji-card {
   max-width: 320px;
