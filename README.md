@@ -90,9 +90,11 @@ cd .. && mvn clean package -DskipTests
 |---|---|---|
 | 明暗模式 | 深色 / 浅色 / 跟随系统 | `JUSIC_THEME_MODE` |
 | 配色来源 | 品牌配色 / 跟随背景图 | `JUSIC_THEME_SEED_SOURCE` |
+| 上次提取的 seed（内部缓存） | — | `JUSIC_THEME_BG_SEED` |
 
-「跟随背景图」用 Celebi 量化 + Score 从首页背景图提取主色；**跨域或提取失败时回退到品牌色**，
-取色失败不会影响界面可用性。
+「跟随背景图」用 Celebi 量化 + Score 从首页背景图提取主色。取色要等图片加载（异步），
+故上次结果会缓存下来作为下次的首帧值——否则每次刷新都会先显示品牌 teal、几百毫秒后才跳成提取色。
+**跨域或提取失败时保留上一个有效配色**，不会退回品牌色，更不会影响界面可用性。
 
 - **换品牌色**：改 `src/theme/md3.ts` 的 `DEFAULT_SEED`，62 个 MD3 角色会整套重算。
 - **校验**：`npm run verify:theme` —— 断言角色齐全性、对比度、非法 seed 回退。

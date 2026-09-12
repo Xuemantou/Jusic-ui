@@ -13,6 +13,7 @@ import { homeBackground } from '@/config/appearance'
 
 const MODE_KEY = 'JUSIC_THEME_MODE'
 const SEED_SOURCE_KEY = 'JUSIC_THEME_SEED_SOURCE'
+const BG_SEED_KEY = 'JUSIC_THEME_BG_SEED'
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type SeedSource = 'default' | 'background'
@@ -29,8 +30,14 @@ function restore<T extends string>(key: string, allowed: readonly T[], fallback:
 export const themeMode = ref<ThemeMode>(restore(MODE_KEY, MODES, 'dark'))
 export const seedSource = ref<SeedSource>(restore(SEED_SOURCE_KEY, SEED_SOURCES, 'default'))
 
-/** 从背景图提取出的 seed；为空表示未启用或提取失败 */
-const backgroundSeed = ref('')
+/**
+ * 从背景图提取出的 seed；为空表示未启用或尚未提取成功。
+ *
+ * 初始值取自上次提取结果的缓存。取色必须等图片加载完成（异步），
+ * 若从空值起步，选了「跟随背景图」的用户每次刷新都会先看到品牌 teal、
+ * 几百毫秒后才跳成提取色。用缓存当首帧值，可让这次跳变只在首次启用时发生。
+ */
+const backgroundSeed = ref(localStorage.getItem(BG_SEED_KEY) || '')
 
 /** 实际生效的 seed：跟随背景图且提取成功时用它，否则用品牌默认色 */
 export const activeSeed = computed(() =>
@@ -60,7 +67,12 @@ export function setSeedSource(source: SeedSource) {
 
 /**
  * 背景图或 seed 来源变化时重新取色。
- * 取色是异步的（要等图片加载），所以在结果回来前先沿用默认 seed，界面不会闪烁成空白。
+ *
+ * 取色是异步的（需等图片加载），期间沿用已有值（缓存值或品牌默认色），
+ * 因此不会出现空白，但首次提取完成时会有一次颜色过渡。
+ *
+ * 取色失败（跨域 canvas 被污染、图片加载失败）时保留原值而非清空：
+ * 沿用上一个有效配色，比突然退回品牌色更不显眼。
  */
 watch(
   [homeBackground, seedSource],
@@ -69,7 +81,11 @@ watch(
       backgroundSeed.value = ''
       return
     }
-    backgroundSeed.value = (await extractSeed(url)) || ''
+    const seed = await extractSeed(url)
+    if (seed) {
+      backgroundSeed.value = seed
+      localStorage.setItem(BG_SEED_KEY, seed)
+    }
   },
   { immediate: true },
 )
