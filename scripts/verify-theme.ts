@@ -115,6 +115,42 @@ check('非法 seed 回退到默认配色', fallback.primary === teal.primary)
 check('MD2 遗留变体键已覆盖为 MD3 值', teal['primary-darken-1'] === teal.primary, teal['primary-darken-1'])
 check('surface-light 已映射（组件依赖）', teal['surface-light'] === teal['surface-container-high'])
 
+// ---------- 防止 Vuetify 默认主题的 MD2 值泄漏 ----------
+// Vuetify 的主题是 mergeDeep(defaults, options) 合并的，默认主题里硬编码的键不会消失。
+// 若 md3Colors 没覆盖到，最终 CSS 里就会残留这些 MD2 颜色。
+console.log()
+console.log('=== Vuetify 默认主题键覆盖 ===')
+
+const VUETIFY_DEFAULT_KEYS = [
+  'background', 'surface', 'surface-bright', 'surface-light', 'surface-variant',
+  'on-surface-variant', 'primary', 'primary-darken-1', 'secondary', 'secondary-darken-1',
+  'error', 'info', 'success', 'warning',
+]
+
+// 摘自 vuetify/lib/composables/theme.js 的 genDefaults()
+const VUETIFY_MD2_DEFAULTS: Record<string, string> = {
+  '#1867c0': 'light primary', '#1f5592': 'light primary-darken-1',
+  '#48a9a6': 'light secondary', '#018786': 'light secondary-darken-1',
+  '#b00020': 'light error', '#121212': 'dark background', '#212121': 'dark surface',
+  '#ccbfd6': 'dark surface-bright', '#424242': 'dark surface-light',
+  '#c8c8c8': 'dark surface-variant', '#2196f3': 'primary/info', '#277cc1': 'dark primary-darken-1',
+  '#54b6b2': 'dark secondary', '#cf6679': 'dark error', '#4caf50': 'success', '#fb8c00': 'warning',
+}
+
+for (const dark of [true, false]) {
+  const label = dark ? '深色' : '浅色'
+  const colors = md3Colors(DEFAULT_SEED, dark)
+
+  const uncovered = VUETIFY_DEFAULT_KEYS.filter(k => !(k in colors))
+  check(`${label}：覆盖 Vuetify 默认主题全部 ${VUETIFY_DEFAULT_KEYS.length} 个键`, uncovered.length === 0,
+    uncovered.length ? `未覆盖: ${uncovered.join(', ')}` : '')
+
+  const leaked = Object.entries(colors)
+    .filter(([, v]) => VUETIFY_MD2_DEFAULTS[v.toLowerCase()])
+    .map(([k, v]) => `${k}=${v}(${VUETIFY_MD2_DEFAULTS[v.toLowerCase()]})`)
+  check(`${label}：无 MD2 默认色残留`, leaked.length === 0, leaked.slice(0, 4).join(' '))
+}
+
 // ---------- 设计令牌：高度 / 状态层 / 形状 ----------
 console.log()
 console.log('=== 设计令牌 ===')

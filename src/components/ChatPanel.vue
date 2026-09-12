@@ -190,11 +190,13 @@ watch(
 }
 .chat-notice {
   text-align: center;
+  font-size: var(--v-type-body-small-size);
+  line-height: var(--v-type-body-small-height);
   color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 12px;
 }
 .chat-user {
-  font-size: 12px;
+  font-size: var(--v-type-body-small-size);
+  line-height: var(--v-type-body-small-height);
   color: rgb(var(--v-theme-on-surface-variant));
   margin-bottom: 2px;
 }
