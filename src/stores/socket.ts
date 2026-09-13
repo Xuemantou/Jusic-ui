@@ -14,10 +14,13 @@ export const useSocketStore = defineStore('socket', () => {
   const isConnected = ref(false)
   const userName = ref<string | null>(localStorage.getItem('USER_NAME'))
   /**
-   * 聊天默认音源（wy / qq / mg）。
+   * 聊天默认音源（wy / qq）。
    * 原来它是 ChatPanel 内部的 ref，刷新即丢，每次进房都要重新选一遍。
+   * 已移除咪咕音源：历史存值若是 mg 则回落到 wy，避免界面无选中项、点歌带上无效 source。
    */
-  const chatSource = ref<string>(localStorage.getItem('JUSIC_CHAT_SOURCE') || 'wy')
+  const chatSource = ref<string>(
+    localStorage.getItem('JUSIC_CHAT_SOURCE') === 'qq' ? 'qq' : 'wy',
+  )
   const isRoot = ref(false)
   const isAdmin = ref(false)
   const good = ref(false)

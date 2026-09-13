@@ -23,7 +23,6 @@
           <v-btn-toggle v-model="source" mandatory color="primary" variant="outlined" divided>
             <v-btn value="wy" size="small">网易</v-btn>
             <v-btn value="qq" size="small">QQ</v-btn>
-            <v-btn value="mg" size="small">咪咕</v-btn>
           </v-btn-toggle>
           <v-btn icon color="primary" class="ml-2" @click="search">
             <v-icon>mdi-magnify</v-icon>

@@ -620,25 +620,16 @@ export function useSocket() {
     playerStore.setMusic2(secondUrl ? { url: secondUrl } : {})
   }
 
-  /** 音乐 URL 清洗（对齐旧代码，处理酷我/网易的地址） */
+  /** 音乐 URL 清洗（对齐旧代码，处理网易的地址） */
   function cleanMusicUrl(url: string): string {
     if (!url) return url
     // 同一原始地址在短时间内复用同一结果：保证「预加载的那一份」就是「即将播放的那一份」
     const hit = cleanedUrlCache.get(url)
     if (hit && Date.now() - hit.time < URL_CACHE_TTL) return hit.url
     let result = url
-    if (result.indexOf('kuwo.cn') !== -1 && result.indexOf('-') === -1) {
-      const urls = result.split('.sycdn.')
-      if (urls.length === 2) {
-        const headUrls = urls[0].replace('http://', '').split('.')
-        const lastHeadUrl = headUrls[headUrls.length - 1]
-        result = `https://${lastHeadUrl}-sycdn.${urls[1]}&timestamp=${Date.now()}`
-      }
-    } else {
-      result += result.indexOf('?') !== -1 ? `&timestamp=${Date.now()}` : `?timestamp=${Date.now()}`
-      if (result.indexOf('/ymusic/') !== -1) {
-        result = result.replace(/(m\d+?)(?!c)\.music\.126\.net/, '$1c.music.126.net')
-      }
+    result += result.indexOf('?') !== -1 ? `&timestamp=${Date.now()}` : `?timestamp=${Date.now()}`
+    if (result.indexOf('/ymusic/') !== -1) {
+      result = result.replace(/(m\d+?)(?!c)\.music\.126\.net/, '$1c.music.126.net')
     }
     result = result.replace('http://', 'https://')
     cleanedUrlCache.set(url, { url: result, time: Date.now() })

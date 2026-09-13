@@ -42,7 +42,6 @@
         <v-btn-toggle v-model="source" mandatory variant="outlined" divided color="primary">
           <v-btn value="wy">网易</v-btn>
           <v-btn value="qq">QQ</v-btn>
-          <v-btn value="mg">咪咕</v-btn>
         </v-btn-toggle>
         <p class="text-body-2 on-surface-variant mt-2">
           聊天框点歌 / 搜歌时优先使用的音源，同样会自动记住。

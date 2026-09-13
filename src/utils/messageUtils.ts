@@ -24,7 +24,8 @@ export function parseMessageContent<T = unknown>(source: string): MessageRespons
   const strings = source.split('\n')
   if (strings.length === 0) return null
   try {
-    return JSON.parse(strings[strings.length - 1]) as MessageResponse<T>
+    // 服务端帧按 STOMP 规范以 NULL 结尾，解析前先剥掉
+    return JSON.parse(strings[strings.length - 1].replace(/\0+$/, '')) as MessageResponse<T>
   } catch {
     return null
   }

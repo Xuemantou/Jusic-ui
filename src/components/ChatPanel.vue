@@ -91,7 +91,6 @@
         >
           <v-btn value="wy" size="small">网易</v-btn>
           <v-btn value="qq" size="small">QQ</v-btn>
-          <v-btn value="mg" size="small">咪咕</v-btn>
         </v-btn-toggle>
         <v-spacer />
         <v-btn icon size="small" variant="text" title="投票切歌" @click="musicSkipVote">
